@@ -1,6 +1,6 @@
 """
-Knowledge Graph Integration für den LLM Stack.
+Knowledge Graph Integration for the LLM Stack.
 
-Dieses Paket enthält die Integration mit neo4j für den Knowledge Graph,
-der als zentrale Wissensbasis für autonome AI Coding Agents dient.
+This package contains the integration with neo4j for the Knowledge Graph,
+which serves as a central knowledge base for autonomous AI Coding Agents.
 """

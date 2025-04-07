@@ -1,463 +1,1411 @@
 """
-Konfigurationsmanagement für den LLM Stack.
+Configuration management for the LLM Stack.
 
-Dieses Modul stellt Funktionen zum Laden, Validieren und Verwalten der Konfiguration bereit.
+This module provides functions for loading, validating, and managing the configuration
+for the LOCAL-LLM-STACK-RELOADED project. It includes functionality for:
+
+1. Loading and saving configuration from .env files
+2. Validating configuration values
+3. Generating and managing secure secrets
+4. Managing LibreChat secrets
+5. Creating backups of configuration files
+
+The module implements a singleton ConfigManager class to maintain configuration state
+and provides module-level functions for backward compatibility.
+
+Examples:
+    Loading configuration:
+    ```python
+    from llm_stack.core import config
+    
+    # Load configuration from default .env file
+    config.load_config()
+    
+    # Get a configuration value
+    port = config.get_config("HOST_PORT_OLLAMA", "11434")
+    ```
+    
+    Generating secrets:
+    ```python
+    from llm_stack.core import config
+    
+    # Generate secure secrets
+    config.generate_secrets()
+    
+    # Update LibreChat secrets from main configuration
+    config.update_librechat_secrets()
+    ```
+    
+    Validating configuration:
+    ```python
+    from llm_stack.core import config
+    
+    # Validate configuration
+    if config.validate_config():
+        print("Configuration is valid")
+    else:
+        print("Configuration is invalid")
+    ```
 """
 
 import os
 import shutil
 import subprocess
 import tempfile
+import threading
+import functools
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any, Callable
 
 import yaml
 from pydantic import BaseModel, Field
 
 from llm_stack.core import logging
 
-# Standardkonfigurationswerte
-DEFAULT_CONFIG_DIR = "config"
-DEFAULT_ENV_FILE = f"{DEFAULT_CONFIG_DIR}/.env"
-DEFAULT_CORE_PROJECT = "local-llm-stack"
-DEFAULT_DEBUG_PROJECT = f"{DEFAULT_CORE_PROJECT}-debug"
-DEFAULT_CORE_COMPOSE = "-f docker/core/docker-compose.yml"
-DEFAULT_DEBUG_COMPOSE = f"{DEFAULT_CORE_COMPOSE} -f docker/core/docker-compose.debug.yml"
+# Configuration class to replace global variables
+class ConfigManager:
+    """
+    Configuration manager for the LLM Stack.
+    
+    This class implements a singleton pattern to maintain configuration state
+    across the application. It provides methods for loading, saving, validating,
+    and managing configuration values, as well as generating and managing secure
+    secrets.
+    
+    The ConfigManager maintains default values for configuration paths and project
+    names, and provides methods to override these defaults.
+    
+    Attributes:
+        DEFAULT_CONFIG_DIR (str): Default configuration directory
+        DEFAULT_ENV_FILE (str): Default environment file path
+        DEFAULT_CORE_PROJECT (str): Default core project name
+        DEFAULT_DEBUG_PROJECT (str): Default debug project name
+        DEFAULT_CORE_COMPOSE (str): Default core Docker Compose command
+        DEFAULT_DEBUG_COMPOSE (str): Default debug Docker Compose command
+    """
+    
+    # Default configuration values
+    DEFAULT_CONFIG_DIR = "config"
+    DEFAULT_ENV_FILE = f"{DEFAULT_CONFIG_DIR}/.env"
+    DEFAULT_CORE_PROJECT = "local-llm-stack"
+    DEFAULT_DEBUG_PROJECT = f"{DEFAULT_CORE_PROJECT}-debug"
+    DEFAULT_CORE_COMPOSE = "-f docker/core/docker-compose.yml"
+    DEFAULT_DEBUG_COMPOSE = (
+        f"{DEFAULT_CORE_COMPOSE} -f docker/core/docker-compose.debug.yml"
+    )
+    
+    # Singleton instance
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        """
+        Implement thread-safe singleton pattern.
+        
+        Returns:
+            ConfigManager: The singleton instance of the ConfigManager
+        """
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(ConfigManager, cls).__new__(cls)
+                cls._instance._initialized = False
+            return cls._instance
+    
+    def __init__(self):
+        """
+        Initialize the configuration manager with default values.
+        
+        This method sets up the default configuration paths and values.
+        It is only executed once due to the singleton pattern.
+        """
+        # Only initialize once
+        if getattr(self, '_initialized', False):
+            return
+            
+        self.config_dir = self.DEFAULT_CONFIG_DIR
+        self.env_file = self.DEFAULT_ENV_FILE
+        self.core_project = self.DEFAULT_CORE_PROJECT
+        self.debug_project = self.DEFAULT_DEBUG_PROJECT
+        self.core_compose = self.DEFAULT_CORE_COMPOSE
+        self.debug_compose = self.DEFAULT_DEBUG_COMPOSE
+        self.config_values = {}
+        
+        self._initialized = True
+        logging.debug("Configuration manager initialized with default values")
 
-# Globale Konfigurationsvariablen
-CONFIG_DIR = DEFAULT_CONFIG_DIR
-ENV_FILE = DEFAULT_ENV_FILE
-CORE_PROJECT = DEFAULT_CORE_PROJECT
-DEBUG_PROJECT = DEFAULT_DEBUG_PROJECT
-CORE_COMPOSE = DEFAULT_CORE_COMPOSE
-DEBUG_COMPOSE = DEFAULT_DEBUG_COMPOSE
 
-# Konfigurationsmodell
+# Configuration model
 class LLMStackConfig(BaseModel):
-    """Konfigurationsmodell für den LLM Stack."""
+    """
+    Configuration model for the LLM Stack.
     
-    # Allgemeine Konfiguration
-    HOST_PORT_LIBRECHAT: int = Field(3080, description="Port für LibreChat")
-    HOST_PORT_OLLAMA: int = Field(11434, description="Port für Ollama")
+    This Pydantic model defines the configuration schema for the LLM Stack,
+    including default values and descriptions for each configuration parameter.
     
-    # Ressourcenbeschränkungen
-    OLLAMA_CPU_LIMIT: float = Field(0.75, description="CPU-Limit für Ollama")
-    OLLAMA_MEMORY_LIMIT: str = Field("16G", description="Speicherlimit für Ollama")
-    MONGODB_MEMORY_LIMIT: str = Field("2G", description="Speicherlimit für MongoDB")
-    MEILISEARCH_MEMORY_LIMIT: str = Field("1G", description="Speicherlimit für Meilisearch")
-    LIBRECHAT_CPU_LIMIT: float = Field(0.50, description="CPU-Limit für LibreChat")
-    LIBRECHAT_MEMORY_LIMIT: str = Field("4G", description="Speicherlimit für LibreChat")
+    Attributes:
+        HOST_PORT_LIBRECHAT (int): Port for LibreChat
+        HOST_PORT_OLLAMA (int): Port for Ollama
+        OLLAMA_CPU_LIMIT (float): CPU limit for Ollama
+        OLLAMA_MEMORY_LIMIT (str): Memory limit for Ollama
+        MONGODB_MEMORY_LIMIT (str): Memory limit for MongoDB
+        MEILISEARCH_MEMORY_LIMIT (str): Memory limit for Meilisearch
+        LIBRECHAT_CPU_LIMIT (float): CPU limit for LibreChat
+        LIBRECHAT_MEMORY_LIMIT (str): Memory limit for LibreChat
+        OLLAMA_VERSION (str): Ollama version
+        MONGODB_VERSION (str): MongoDB version
+        MEILISEARCH_VERSION (str): Meilisearch version
+        LIBRECHAT_VERSION (str): LibreChat version
+        JWT_SECRET (str): JWT secret for LibreChat
+        JWT_REFRESH_SECRET (str): JWT refresh secret for LibreChat
+        SESSION_SECRET (str): Session secret for LibreChat
+        CRYPT_SECRET (str): Encryption secret for LibreChat
+        CREDS_KEY (str): Credentials key for LibreChat
+        CREDS_IV (str): Credentials IV for LibreChat
+        ADMIN_EMAIL (str): Admin email for LibreChat
+        ADMIN_PASSWORD (str): Admin password for LibreChat
+        ENABLE_AUTH (bool): Enable authentication
+        ALLOW_REGISTRATION (bool): Allow registration
+        ALLOW_SOCIAL_LOGIN (bool): Allow social login
+        DEFAULT_MODELS (str): Default models for Ollama
+        DEBUG_MODE (bool): Enable debug mode
+    """
+
+    # General configuration
+    HOST_PORT_LIBRECHAT: int = Field(3080, description="Port for LibreChat")
+    HOST_PORT_OLLAMA: int = Field(11434, description="Port for Ollama")
+
+    # Resource limitations
+    OLLAMA_CPU_LIMIT: float = Field(0.75, description="CPU limit for Ollama")
+    OLLAMA_MEMORY_LIMIT: str = Field("16G", description="Memory limit for Ollama")
+    MONGODB_MEMORY_LIMIT: str = Field("2G", description="Memory limit for MongoDB")
+    MEILISEARCH_MEMORY_LIMIT: str = Field(
+        "1G", description="Memory limit for Meilisearch"
+    )
+    LIBRECHAT_CPU_LIMIT: float = Field(0.50, description="CPU limit for LibreChat")
+    LIBRECHAT_MEMORY_LIMIT: str = Field("4G", description="Memory limit for LibreChat")
+
+    # Versions
+    OLLAMA_VERSION: str = Field("0.1.27", description="Ollama version")
+    MONGODB_VERSION: str = Field("6.0.6", description="MongoDB version")
+    MEILISEARCH_VERSION: str = Field("latest", description="Meilisearch version")
+    LIBRECHAT_VERSION: str = Field("latest", description="LibreChat version")
+
+    # Security
+    JWT_SECRET: str = Field("", description="JWT secret for LibreChat")
+    JWT_REFRESH_SECRET: str = Field("", description="JWT refresh secret for LibreChat")
+    SESSION_SECRET: str = Field("", description="Session secret for LibreChat")
+    CRYPT_SECRET: str = Field("", description="Encryption secret for LibreChat")
+    CREDS_KEY: str = Field("", description="Credentials key for LibreChat")
+    CREDS_IV: str = Field("", description="Credentials IV for LibreChat")
+
+    # LibreChat configuration
+    ADMIN_EMAIL: str = Field(
+        "admin@local.host", description="Admin email for LibreChat"
+    )
+    ADMIN_PASSWORD: str = Field("", description="Admin password for LibreChat")
+    ENABLE_AUTH: bool = Field(True, description="Enable authentication")
+    ALLOW_REGISTRATION: bool = Field(True, description="Allow registration")
+    ALLOW_SOCIAL_LOGIN: bool = Field(False, description="Allow social login")
+    DEFAULT_MODELS: str = Field("tinyllama", description="Default models for Ollama")
+
+    # Debug configuration
+    DEBUG_MODE: bool = Field(False, description="Enable debug mode")
+
+    def reset_to_defaults(self) -> None:
+        """
+        Reset configuration to default values.
+        
+        This method resets all configuration parameters to their default values
+        as defined in the ConfigManager class.
+        
+        Example:
+            ```python
+            config = LLMStackConfig()
+            config.reset_to_defaults()
+            ```
+        """
+        self.config_dir = self.DEFAULT_CONFIG_DIR
+        self.env_file = self.DEFAULT_ENV_FILE
+        self.core_project = self.DEFAULT_CORE_PROJECT
+        self.debug_project = self.DEFAULT_DEBUG_PROJECT
+        self.core_compose = self.DEFAULT_CORE_COMPOSE
+        self.debug_compose = self.DEFAULT_DEBUG_COMPOSE
+        logging.debug("Configuration reset to default values")
     
-    # Versionen
-    OLLAMA_VERSION: str = Field("0.1.27", description="Ollama-Version")
-    MONGODB_VERSION: str = Field("6.0.6", description="MongoDB-Version")
-    MEILISEARCH_VERSION: str = Field("latest", description="Meilisearch-Version")
-    LIBRECHAT_VERSION: str = Field("latest", description="LibreChat-Version")
+    # Cache decorator for methods
+    @staticmethod
+    def cache_method(func: Callable) -> Callable:
+        """
+        Decorator to cache method results.
+        
+        This decorator caches the results of method calls to improve performance
+        for frequently called methods. The cache is keyed by the method name and
+        arguments.
+        
+        Args:
+            func: The method to decorate
+            
+        Returns:
+            Callable: The decorated method with caching capability
+            
+        Example:
+            ```python
+            @LLMStackConfig.cache_method
+            def get_config(self, key, default_value=""):
+                # Method implementation
+                return value
+            ```
+        """
+        cache = {}
+        
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # Create a cache key from the method name and arguments
+            key = (func.__name__, args, frozenset(kwargs.items()))
+            if key not in cache:
+                cache[key] = func(self, *args, **kwargs)
+            return cache[key]
+        
+        # Add a method to clear the cache
+        wrapper.clear_cache = lambda: cache.clear()
+        return wrapper
     
-    # Sicherheit
-    JWT_SECRET: str = Field("", description="JWT-Secret für LibreChat")
-    JWT_REFRESH_SECRET: str = Field("", description="JWT-Refresh-Secret für LibreChat")
-    SESSION_SECRET: str = Field("", description="Session-Secret für LibreChat")
-    CRYPT_SECRET: str = Field("", description="Verschlüsselungs-Secret für LibreChat")
-    CREDS_KEY: str = Field("", description="Credentials-Key für LibreChat")
-    CREDS_IV: str = Field("", description="Credentials-IV für LibreChat")
+    def load_config(self, env_file: Optional[str] = None) -> bool:
+        """
+        Load configuration from an .env file.
+
+        This method loads configuration values from an environment file and
+        exports them to the environment. It also stores the loaded values
+        in the config_values dictionary.
+
+        Args:
+            env_file: Path to the .env file (defaults to the configured env_file)
+
+        Returns:
+            bool: True if the configuration was successfully loaded, False otherwise
+            
+        Example:
+            ```python
+            from llm_stack.core import config
+            
+            # Load configuration from default .env file
+            config_manager = config.get_config_manager()
+            if config_manager.load_config():
+                print("Configuration loaded successfully")
+            else:
+                print("Failed to load configuration")
+                
+            # Load configuration from a specific file
+            if config_manager.load_config("custom/.env"):
+                print("Custom configuration loaded successfully")
+            ```
+        """
+        if env_file is None:
+            env_file = self.env_file
+            
+        logging.debug(f"Loading configuration from {env_file}")
+
+        # Check if file exists
+        if not os.path.isfile(env_file):
+            logging.warn(f"Configuration file not found: {env_file}")
+            return False
+
+        # Check if file is readable
+        if not os.access(env_file, os.R_OK):
+            logging.error(f"Configuration file is not readable: {env_file}")
+            return False
+
+        # Load variables
+        config_dict = {}
+        logging.debug("Parsing configuration file")
+
+        try:
+            # Use context manager for file operations
+            with open(env_file) as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip comments and empty lines
+                    if not line or line.startswith("#"):
+                        continue
+
+                    # Split key and value
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        key = key.strip()
+                        value = value.strip()
+
+                        # Remove quotes if present
+                        if value.startswith('"') and value.endswith('"'):
+                            value = value[1:-1]
+
+                        # Export variable to environment
+                        os.environ[key] = value
+                        config_dict[key] = value
+                        logging.debug(f"Configuration loaded: {key}={value}")
+
+            # Store loaded configuration
+            self.config_values = config_dict
+            
+            logging.success(f"Configuration loaded from {env_file}")
+            return True
+        except Exception as e:
+            logging.error(f"Error loading configuration: {str(e)}")
+            return False
+    def _generate_random_secret(self, length: int, include_punctuation: bool = False) -> str:
+        """
+        Generate a random secret string of specified length.
+        
+        Args:
+            length: Length of the secret string
+            include_punctuation: Whether to include punctuation characters
+            
+        Returns:
+            str: Random secret string
+        """
+        import secrets
+        import string
+        
+        chars = string.ascii_letters + string.digits
+        if include_punctuation:
+            chars += string.punctuation
+            
+        return "".join(secrets.choice(chars) for _ in range(length))
     
-    # LibreChat-Konfiguration
-    ADMIN_EMAIL: str = Field("admin@local.host", description="Admin-E-Mail für LibreChat")
-    ADMIN_PASSWORD: str = Field("", description="Admin-Passwort für LibreChat")
-    ENABLE_AUTH: bool = Field(True, description="Authentifizierung aktivieren")
-    ALLOW_REGISTRATION: bool = Field(True, description="Registrierung erlauben")
-    ALLOW_SOCIAL_LOGIN: bool = Field(False, description="Social-Login erlauben")
-    DEFAULT_MODELS: str = Field("tinyllama", description="Standardmodelle für Ollama")
+    def _create_backup_if_needed(self) -> None:
+        """Create a backup of the configuration file if it exists."""
+        if os.path.isfile(self.env_file):
+            backup_file = self.backup_config_file()
+            if backup_file:
+                logging.info(f"Backup created: {backup_file}")
     
-    # Debug-Konfiguration
-    DEBUG_MODE: bool = Field(False, description="Debug-Modus aktivieren")
+    def _ensure_config_directory(self) -> None:
+        """Ensure that the configuration directory exists."""
+        os.makedirs(os.path.dirname(self.env_file), exist_ok=True)
+    
+    def _write_variables_to_file(self, file_path: str, variables: List[Tuple[str, str]]) -> None:
+        """
+        Write variables to a configuration file.
+        
+        Args:
+            file_path: Path to the configuration file
+            variables: List of (key, value) tuples to write
+        """
+        with open(file_path, "w") as f:
+            for key, value in variables:
+                f.write(f"{key}={value}\n")
+    
+    def generate_secrets(self) -> bool:
+        """
+        Generate secure secrets for the configuration.
+
+        Returns:
+            bool: True if the secrets were successfully generated, False otherwise
+        """
+        logging.info("Generating secure secrets")
+
+        # Prepare the environment
+        self._create_backup_if_needed()
+        self._ensure_config_directory()
+
+        # Generate random secrets
+        jwt_secret = self._generate_random_secret(64)
+        jwt_refresh_secret = self._generate_random_secret(64)
+        session_secret = self._generate_random_secret(64)
+        crypt_secret = self._generate_random_secret(32)
+        creds_key = self._generate_random_secret(32)
+        creds_iv = self._generate_random_secret(16)
+        admin_password = self._generate_random_secret(16, include_punctuation=True)
+
+        # Variables for the configuration file
+        variables = [
+            ("JWT_SECRET", jwt_secret),
+            ("JWT_REFRESH_SECRET", jwt_refresh_secret),
+            ("SESSION_SECRET", session_secret),
+            ("CRYPT_SECRET", crypt_secret),
+            ("CREDS_KEY", creds_key),
+            ("CREDS_IV", creds_iv),
+            ("ADMIN_PASSWORD", admin_password),
+        ]
+
+        # Update or create configuration file
+        if os.path.isfile(self.env_file):
+            # Update existing configuration
+            self.update_env_vars(self.env_file, variables)
+        else:
+            # Create new configuration file
+            self._write_variables_to_file(self.env_file, variables)
+
+        # Update LibreChat secrets
+        self.update_librechat_secrets()
+
+        logging.success("Secure secrets generated")
+        logging.info(
+            f"Admin password: {admin_password} (save this in a secure location)"
+        )
+
+        return True
+        
+    def update_librechat_secrets(self) -> bool:
+        """
+        Update LibreChat secrets from the main configuration.
+
+        Returns:
+            bool: True if the secrets were successfully updated, False otherwise
+        """
+        logging.info("Updating LibreChat secrets from the main configuration")
+
+        # LibreChat .env file
+        librechat_env = f"{self.config_dir}/librechat/.env"
+
+        # Ensure that the LibreChat configuration directory exists
+        os.makedirs(os.path.dirname(librechat_env), exist_ok=True)
+
+        # Get secrets from the main configuration
+        jwt_secret = self.get_config("JWT_SECRET", "")
+        jwt_refresh_secret = self.get_config("JWT_REFRESH_SECRET", "")
+        session_secret = self.get_config("SESSION_SECRET", "")
+        crypt_secret = self.get_config("CRYPT_SECRET", "")
+        creds_key = self.get_config("CREDS_KEY", "")
+        creds_iv = self.get_config("CREDS_IV", "")
+        admin_password = self.get_config("ADMIN_PASSWORD", "")
+
+        # Variables for the LibreChat configuration file
+        variables = [
+            ("JWT_SECRET", jwt_secret),
+            ("JWT_REFRESH_SECRET", jwt_refresh_secret),
+            ("SESSION_SECRET", session_secret),
+            ("CRYPT_SECRET", crypt_secret),
+            ("CREDS_KEY", creds_key),
+            ("CREDS_IV", creds_iv),
+            ("ADMIN_PASSWORD", admin_password),
+        ]
+
+        # Update or create LibreChat configuration file
+        if os.path.isfile(librechat_env):
+            # Create backup
+            backup_file = self.backup_config_file(librechat_env)
+            if backup_file:
+                logging.info(f"Backup created: {backup_file}")
+
+            # Update existing configuration
+            self.update_env_vars(librechat_env, variables)
+        else:
+            # Create new configuration file
+            with open(librechat_env, "w") as f:
+                for key, value in variables:
+                    f.write(f"{key}={value}\n")
+
+        logging.success("LibreChat secrets updated")
+        return True
+        
+    def show_config(self) -> None:
+        """Show the current configuration."""
+        try:
+            if os.path.isfile(self.env_file):
+                with open(self.env_file) as f:
+                    print(f.read())
+            else:
+                logging.error(f"Configuration file not found: {self.env_file}")
+        except Exception as e:
+            logging.error(f"Error showing configuration: {str(e)}")
+    
+    def edit_config(self) -> None:
+        """Open the configuration file in the default editor."""
+        editor = os.environ.get("EDITOR", "nano")
+        subprocess.run([editor, self.env_file])
+    def validate_config(self) -> bool:
+        """
+        Validate the configuration.
+
+        Returns:
+            bool: True if the configuration is valid, False otherwise
+        """
+        logging.debug("Validating configuration")
+
+        # Check if required configuration files exist
+        if not os.path.isfile(self.env_file):
+            logging.error(f"Main configuration file not found: {self.env_file}")
+            return False
+
+        # Validate port configurations
+        host_port_ollama = self.get_config("HOST_PORT_OLLAMA", "11434")
+        if not host_port_ollama.isdigit():
+            logging.error(f"HOST_PORT_OLLAMA must be a number: {host_port_ollama}")
+            return False
+
+        host_port_librechat = self.get_config("HOST_PORT_LIBRECHAT", "3080")
+        if not host_port_librechat.isdigit():
+            logging.error(f"HOST_PORT_LIBRECHAT must be a number: {host_port_librechat}")
+            return False
+
+        # Validate resource limitations
+        ollama_cpu_limit = self.get_config("OLLAMA_CPU_LIMIT", "0.75")
+        try:
+            float(ollama_cpu_limit)
+        except ValueError:
+            logging.error(
+                f"OLLAMA_CPU_LIMIT must be a decimal number: {ollama_cpu_limit}"
+            )
+            return False
+
+        # Validate memory limitations (ensure they have the G suffix)
+        ollama_memory_limit = self.get_config("OLLAMA_MEMORY_LIMIT", "16G")
+        if not ollama_memory_limit.endswith("G"):
+            logging.error(
+                f"OLLAMA_MEMORY_LIMIT must be in the format '16G': {ollama_memory_limit}"
+            )
+            return False
+
+        # Validate security settings
+        jwt_secret = self.get_config("JWT_SECRET", "")
+        if not jwt_secret:
+            logging.error("JWT_SECRET is not set")
+            return False
+
+        jwt_refresh_secret = self.get_config("JWT_REFRESH_SECRET", "")
+        if not jwt_refresh_secret:
+            logging.error("JWT_REFRESH_SECRET is not set")
+            return False
+
+        logging.success("Configuration validation passed")
+        return True
+        
+    def check_secrets(self) -> bool:
+        """
+        Check if secrets are generated and generate them if needed.
+
+        Returns:
+            bool: True if all required secrets are set, False otherwise
+        """
+        logging.info("Checking if secrets are generated")
+
+        # Check if config/.env exists
+        if not os.path.isfile(self.env_file):
+            logging.warn("Configuration file not found. Generating secrets...")
+            self.generate_secrets()
+            return True
+
+        # Check if required secrets in the main configuration file are empty
+        jwt_secret = self.get_config("JWT_SECRET", "")
+        jwt_refresh_secret = self.get_config("JWT_REFRESH_SECRET", "")
+        session_secret = self.get_config("SESSION_SECRET", "")
+
+        # Also check the LibreChat .env file if it exists
+        librechat_jwt_secret = ""
+        librechat_jwt_refresh_secret = ""
+        librechat_needs_update = False
+        librechat_env = f"{self.config_dir}/librechat/.env"
+
+        if os.path.isfile(librechat_env):
+            logging.debug("LibreChat .env file found")
+
+            # Get LibreChat JWT secrets
+            with open(librechat_env) as f:
+                for line in f:
+                    if line.startswith("JWT_SECRET="):
+                        librechat_jwt_secret = line.split("=", 1)[1].strip()
+                    elif line.startswith("JWT_REFRESH_SECRET="):
+                        librechat_jwt_refresh_secret = line.split("=", 1)[1].strip()
+
+            # Check if LibreChat secrets are empty
+            if not librechat_jwt_secret:
+                logging.warn("LibreChat JWT_SECRET is empty")
+                librechat_needs_update = True
+
+            if not librechat_jwt_refresh_secret:
+                logging.warn("LibreChat JWT_REFRESH_SECRET is empty")
+                librechat_needs_update = True
+
+        # Check if main secrets need to be generated
+        if not jwt_secret or not jwt_refresh_secret or not session_secret:
+            logging.warn(
+                "Some required secrets are not set in the main configuration. Generating secrets..."
+            )
+            self.generate_secrets()
+        elif librechat_needs_update:
+            logging.warn(
+                "LibreChat JWT secrets need to be updated. Updating from main configuration..."
+            )
+
+            # Update LibreChat secrets from main configuration
+            self.update_librechat_secrets()
+        else:
+            logging.success("All required secrets are set")
+
+        return True
+    def save_config(
+        self, env_file: Optional[str] = None, variables: Optional[List[Tuple[str, str]]] = None
+    ) -> bool:
+        """
+        Save configuration to an .env file.
+
+        Args:
+            env_file: Path to the .env file (defaults to the configured env_file)
+            variables: List of (key, value) tuples to be saved
+
+        Returns:
+            bool: True if the configuration was successfully saved, False otherwise
+        """
+        if env_file is None:
+            env_file = self.env_file
+            
+        logging.debug(f"Saving configuration to {env_file}")
+
+        # Ensure that the configuration directory exists
+        config_dir = os.path.dirname(env_file)
+        os.makedirs(config_dir, exist_ok=True)
+
+        # Create backup if the file exists
+        if os.path.isfile(env_file):
+            backup_file = self.backup_config_file(env_file)
+            if backup_file:
+                logging.info(f"Backup created: {backup_file}")
+            else:
+                logging.warn("Could not create backup of configuration file")
+
+        # If no variables are specified, don't change the file
+        if not variables:
+            logging.debug("No variables specified, configuration file not changed")
+            return True
+
+        # Update configuration file
+        try:
+            # If the file doesn't exist, create a new file
+            if not os.path.isfile(env_file):
+                with open(env_file, "w") as f:
+                    for key, value in variables:
+                        f.write(f"{key}={value}\n")
+            else:
+                # Update existing file
+                self.update_env_vars(env_file, variables)
+
+            # Update the config values
+            if variables:
+                for key, value in variables:
+                    self.config_values[key] = value
+                    
+            logging.success(f"Configuration saved to {env_file}")
+            return True
+        except Exception as e:
+            logging.error(f"Error saving configuration: {str(e)}")
+            return False
+            
+    def _create_new_env_file(self, env_file: str, variables: List[Tuple[str, str]]) -> bool:
+        """
+        Create a new environment file with the given variables.
+        
+        Args:
+            env_file: Path to the .env file
+            variables: List of (key, value) tuples to be written
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            self._write_variables_to_file(env_file, variables)
+            return True
+        except Exception as e:
+            logging.error(f"Could not write to {env_file}: {str(e)}")
+            return False
+    
+    def _update_existing_env_file(self, env_file: str, variables: List[Tuple[str, str]]) -> bool:
+        """
+        Update an existing environment file with the given variables.
+        
+        Args:
+            env_file: Path to the .env file
+            variables: List of (key, value) tuples to be updated
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp_file:
+                # Variables to track which keys were found
+                found_keys = set()
+
+                # Read and update existing file
+                with open(env_file) as f:
+                    for line in f:
+                        line = line.strip()
+                        # Keep comments and empty lines
+                        if not line or line.startswith("#"):
+                            tmp_file.write(f"{line}\n")
+                            continue
+
+                        # Split key and value
+                        if "=" in line:
+                            key, _ = line.split("=", 1)
+                            key = key.strip()
+
+                            # Check if the key should be updated
+                            for var_key, var_value in variables:
+                                if key == var_key:
+                                    tmp_file.write(f"{var_key}={var_value}\n")
+                                    found_keys.add(var_key)
+                                    break
+                            else:
+                                # If the key should not be updated, keep the line
+                                tmp_file.write(f"{line}\n")
+                        else:
+                            # Keep lines without "="
+                            tmp_file.write(f"{line}\n")
+
+                # Add keys that were not found
+                for var_key, var_value in variables:
+                    if var_key not in found_keys:
+                        tmp_file.write(f"{var_key}={var_value}\n")
+
+            # Copy temporary file to original file
+            shutil.move(tmp_file.name, env_file)
+            return True
+        except Exception as e:
+            logging.error(f"Could not update {env_file}: {str(e)}")
+            # Delete temporary file if it could not be moved
+            if 'tmp_file' in locals() and os.path.exists(tmp_file.name):
+                os.unlink(tmp_file.name)
+            return False
+    
+    def update_env_vars(self, env_file: str, variables: List[Tuple[str, str]]) -> bool:
+        """
+        Update environment variables in an .env file.
+
+        Args:
+            env_file: Path to the .env file
+            variables: List of (key, value) tuples to be updated
+
+        Returns:
+            bool: True if the update was successful, False otherwise
+        """
+        logging.debug(f"Updating environment variables in {env_file}")
+
+        # Check if file exists and is writable
+        if not os.path.isfile(env_file):
+            logging.debug(f"Creating new file: {env_file}")
+            return self._create_new_env_file(env_file, variables)
+
+        # Check if file is writable
+        if not os.access(env_file, os.W_OK):
+            logging.error(f"File {env_file} is not writable")
+            return False
+
+        return self._update_existing_env_file(env_file, variables)
+            
+    def _validate_port_config(self, port_name: str, default_value: str) -> bool:
+        """
+        Validate that a port configuration is a valid number.
+        
+        Args:
+            port_name: Name of the port configuration
+            default_value: Default value for the port
+            
+        Returns:
+            bool: True if valid, False otherwise
+        """
+        port_value = self.get_config(port_name, default_value)
+        if not port_value.isdigit():
+            logging.error(f"{port_name} must be a number: {port_value}")
+            return False
+        return True
+    
+    def _validate_resource_limit(self, limit_name: str, default_value: str, validation_func: callable) -> bool:
+        """
+        Validate a resource limit using the provided validation function.
+        
+        Args:
+            limit_name: Name of the resource limit
+            default_value: Default value for the limit
+            validation_func: Function to validate the limit value
+            
+        Returns:
+            bool: True if valid, False otherwise
+        """
+        limit_value = self.get_config(limit_name, default_value)
+        if not validation_func(limit_value):
+            return False
+        return True
+    
+    @cache_method
+    def validate_config(self) -> bool:
+        """
+        Validate the configuration.
+
+        Returns:
+            bool: True if the configuration is valid, False otherwise
+        """
+        logging.debug("Validating configuration")
+
+        try:
+            # Check if required configuration files exist
+            if not os.path.isfile(self.env_file):
+                logging.error(f"Main configuration file not found: {self.env_file}")
+                return False
+
+            # Validate port configurations
+            if not self._validate_port_config("HOST_PORT_OLLAMA", "11434"):
+                return False
+                
+            if not self._validate_port_config("HOST_PORT_LIBRECHAT", "3080"):
+                return False
+
+            # Validate resource limitations
+            def validate_cpu_limit(value):
+                try:
+                    float(value)
+                    return True
+                except ValueError:
+                    logging.error(f"OLLAMA_CPU_LIMIT must be a decimal number: {value}")
+                    return False
+                    
+            if not self._validate_resource_limit("OLLAMA_CPU_LIMIT", "0.75", validate_cpu_limit):
+                return False
+
+            # Validate memory limitations
+            def validate_memory_limit(value):
+                if not value.endswith("G"):
+                    logging.error(f"OLLAMA_MEMORY_LIMIT must be in the format '16G': {value}")
+                    return False
+                return True
+                
+            if not self._validate_resource_limit("OLLAMA_MEMORY_LIMIT", "16G", validate_memory_limit):
+                return False
+
+            # Validate security settings
+            jwt_secret = self.get_config("JWT_SECRET", "")
+            if not jwt_secret:
+                logging.error("JWT_SECRET is not set")
+                return False
+
+            jwt_refresh_secret = self.get_config("JWT_REFRESH_SECRET", "")
+            if not jwt_refresh_secret:
+                logging.error("JWT_REFRESH_SECRET is not set")
+                return False
+
+            logging.success("Configuration validation passed")
+            return True
+        except Exception as e:
+            logging.error(f"Error validating configuration: {str(e)}")
+            return False
+    def _check_librechat_secrets(self) -> Tuple[bool, bool]:
+        """
+        Check if LibreChat secrets are set and valid.
+        
+        Returns:
+            Tuple[bool, bool]: (LibreChat env exists, LibreChat needs update)
+        """
+        librechat_jwt_secret = ""
+        librechat_jwt_refresh_secret = ""
+        librechat_needs_update = False
+        librechat_env = f"{self.config_dir}/librechat/.env"
+        librechat_exists = False
+
+        if os.path.isfile(librechat_env):
+            librechat_exists = True
+            logging.debug("LibreChat .env file found")
+
+            # Get LibreChat JWT secrets - use context manager
+            with open(librechat_env) as f:
+                for line in f:
+                    if line.startswith("JWT_SECRET="):
+                        librechat_jwt_secret = line.split("=", 1)[1].strip()
+                    elif line.startswith("JWT_REFRESH_SECRET="):
+                        librechat_jwt_refresh_secret = line.split("=", 1)[1].strip()
+
+            # Check if LibreChat secrets are empty
+            if not librechat_jwt_secret:
+                logging.warn("LibreChat JWT_SECRET is empty")
+                librechat_needs_update = True
+
+            if not librechat_jwt_refresh_secret:
+                logging.warn("LibreChat JWT_REFRESH_SECRET is empty")
+                librechat_needs_update = True
+                
+        return librechat_exists, librechat_needs_update
+    
+    @cache_method
+    def check_secrets(self) -> bool:
+        """
+        Check if secrets are generated and generate them if needed.
+
+        Returns:
+            bool: True if all required secrets are set, False otherwise
+        """
+        logging.info("Checking if secrets are generated")
+
+        try:
+            # Check if config/.env exists
+            if not os.path.isfile(self.env_file):
+                logging.warn("Configuration file not found. Generating secrets...")
+                self.generate_secrets()
+                return True
+
+            # Check if required secrets in the main configuration file are empty
+            jwt_secret = self.get_config("JWT_SECRET", "")
+            jwt_refresh_secret = self.get_config("JWT_REFRESH_SECRET", "")
+            session_secret = self.get_config("SESSION_SECRET", "")
+
+            # Check LibreChat secrets
+            librechat_exists, librechat_needs_update = self._check_librechat_secrets()
+
+            # Check if main secrets need to be generated
+            if not jwt_secret or not jwt_refresh_secret or not session_secret:
+                logging.warn(
+                    "Some required secrets are not set in the main configuration. Generating secrets..."
+                )
+                self.generate_secrets()
+            elif librechat_exists and librechat_needs_update:
+                logging.warn(
+                    "LibreChat JWT secrets need to be updated. Updating from main configuration..."
+                )
+                # Update LibreChat secrets from main configuration
+                self.update_librechat_secrets()
+            else:
+                logging.success("All required secrets are set")
+
+            return True
+        except Exception as e:
+            logging.error(f"Error checking secrets: {str(e)}")
+            return False
+        
+    def generate_secrets(self) -> bool:
+        """
+        Generate secure secrets for the configuration.
+
+        Returns:
+            bool: True if the secrets were successfully generated, False otherwise
+        """
+        import secrets
+        import string
+
+        logging.info("Generating secure secrets")
+
+        # Create backup of current configuration if it exists
+        if os.path.isfile(self.env_file):
+            backup_file = self.backup_config_file()
+            if backup_file:
+                logging.info(f"Backup created: {backup_file}")
+
+        # Ensure that the configuration directory exists
+        os.makedirs(os.path.dirname(self.env_file), exist_ok=True)
+
+        # Generate random secrets
+        jwt_secret = "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(64)
+        )
+        jwt_refresh_secret = "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(64)
+        )
+        session_secret = "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(64)
+        )
+        crypt_secret = "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
+        )
+        creds_key = "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
+        )
+        creds_iv = "".join(
+            secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
+        )
+        admin_password = "".join(
+            secrets.choice(string.ascii_letters + string.digits + string.punctuation)
+            for _ in range(16)
+        )
+
+        # Variables for the configuration file
+        variables = [
+            ("JWT_SECRET", jwt_secret),
+            ("JWT_REFRESH_SECRET", jwt_refresh_secret),
+            ("SESSION_SECRET", session_secret),
+            ("CRYPT_SECRET", crypt_secret),
+            ("CREDS_KEY", creds_key),
+            ("CREDS_IV", creds_iv),
+            ("ADMIN_PASSWORD", admin_password),
+        ]
+
+        # Update or create configuration file
+        if os.path.isfile(self.env_file):
+            # Update existing configuration
+            self.update_env_vars(self.env_file, variables)
+        else:
+            # Create new configuration file
+            with open(self.env_file, "w") as f:
+                for key, value in variables:
+                    f.write(f"{key}={value}\n")
+
+        # Update LibreChat secrets
+        self.update_librechat_secrets()
+
+        logging.success("Secure secrets generated")
+        logging.info(
+            f"Admin password: {admin_password} (save this in a secure location)"
+        )
+
+        return True
+        
+    def update_librechat_secrets(self) -> bool:
+        """
+        Update LibreChat secrets from the main configuration.
+
+        Returns:
+            bool: True if the secrets were successfully updated, False otherwise
+        """
+        logging.info("Updating LibreChat secrets from the main configuration")
+
+        # LibreChat .env file
+        librechat_env = f"{self.config_dir}/librechat/.env"
+
+        # Ensure that the LibreChat configuration directory exists
+        os.makedirs(os.path.dirname(librechat_env), exist_ok=True)
+
+        # Get secrets from the main configuration
+        jwt_secret = self.get_config("JWT_SECRET", "")
+        jwt_refresh_secret = self.get_config("JWT_REFRESH_SECRET", "")
+        session_secret = self.get_config("SESSION_SECRET", "")
+        crypt_secret = self.get_config("CRYPT_SECRET", "")
+        creds_key = self.get_config("CREDS_KEY", "")
+        creds_iv = self.get_config("CREDS_IV", "")
+        admin_password = self.get_config("ADMIN_PASSWORD", "")
+
+        # Variables for the LibreChat configuration file
+        variables = [
+            ("JWT_SECRET", jwt_secret),
+            ("JWT_REFRESH_SECRET", jwt_refresh_secret),
+            ("SESSION_SECRET", session_secret),
+            ("CRYPT_SECRET", crypt_secret),
+            ("CREDS_KEY", creds_key),
+            ("CREDS_IV", creds_iv),
+            ("ADMIN_PASSWORD", admin_password),
+        ]
+
+        # Update or create LibreChat configuration file
+        if os.path.isfile(librechat_env):
+            # Create backup
+            backup_file = self.backup_config_file(librechat_env)
+            if backup_file:
+                logging.info(f"Backup created: {backup_file}")
+
+            # Update existing configuration
+            self.update_env_vars(librechat_env, variables)
+        else:
+            # Create new configuration file
+            with open(librechat_env, "w") as f:
+                for key, value in variables:
+                    f.write(f"{key}={value}\n")
+
+        logging.success("LibreChat secrets updated")
+        return True
+        
+    def backup_config_file(self, file_path: Optional[str] = None) -> Optional[str]:
+        """
+        Create a backup of a configuration file.
+
+        Args:
+            file_path: Path to the configuration file (defaults to the configured env_file)
+
+        Returns:
+            Optional[str]: Path to the backup file or None if an error occurred
+        """
+        try:
+            if file_path is None:
+                file_path = self.env_file
+            if not os.path.isfile(file_path):
+                logging.error(f"File not found: {file_path}")
+                return None
+
+            # Create backup filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            backup_path = f"{file_path}.{timestamp}.bak"
+
+            # Use shutil.copy2 to preserve metadata
+            shutil.copy2(file_path, backup_path)
+            return backup_path
+        except Exception as e:
+            logging.error(f"Error creating backup: {str(e)}")
+            return None
+    
+    def show_config(self) -> None:
+        """Show the current configuration."""
+        if os.path.isfile(self.env_file):
+            with open(self.env_file) as f:
+                print(f.read())
+        else:
+            logging.error(f"Configuration file not found: {self.env_file}")
+    
+    def edit_config(self) -> None:
+        """Open the configuration file in the default editor."""
+        editor = os.environ.get("EDITOR", "nano")
+        subprocess.run([editor, self.env_file])
 
 
-# Konfiguration initialisieren
+# Get the singleton instance of the configuration manager
+def get_config_manager() -> ConfigManager:
+    """
+    Get the singleton instance of the configuration manager.
+    
+    Returns:
+        ConfigManager: The configuration manager instance
+    """
+    return ConfigManager()
+
+# Initialize configuration
 def init_config() -> None:
-    """Initialisiert die Konfiguration mit Standardwerten."""
-    global CONFIG_DIR, ENV_FILE, CORE_PROJECT, DEBUG_PROJECT, CORE_COMPOSE, DEBUG_COMPOSE
-    
-    logging.debug("Initialisiere Konfiguration mit Standardwerten")
-    
-    # Standardwerte setzen
-    CONFIG_DIR = DEFAULT_CONFIG_DIR
-    ENV_FILE = DEFAULT_ENV_FILE
-    CORE_PROJECT = DEFAULT_CORE_PROJECT
-    DEBUG_PROJECT = DEFAULT_DEBUG_PROJECT
-    CORE_COMPOSE = DEFAULT_CORE_COMPOSE
-    DEBUG_COMPOSE = DEFAULT_DEBUG_COMPOSE
+    """Initialize the configuration with default values."""
+    config_manager = get_config_manager()
+    config_manager.reset_to_defaults()
+    logging.debug("Configuration initialized with default values")
 
 
-# Konfiguration aus .env-Datei laden
-def load_config(env_file: str = ENV_FILE) -> bool:
+
+# Load configuration from .env file (wrapper for backward compatibility)
+def load_config(env_file: Optional[str] = None) -> bool:
     """
-    Lädt die Konfiguration aus einer .env-Datei.
-    
+    Load configuration from an .env file.
+
     Args:
-        env_file: Pfad zur .env-Datei
-        
+        env_file: Path to the .env file (defaults to the configured env_file)
+
     Returns:
-        bool: True, wenn die Konfiguration erfolgreich geladen wurde, sonst False
+        bool: True if the configuration was successfully loaded, False otherwise
     """
-    logging.debug(f"Lade Konfiguration aus {env_file}")
-    
-    # Prüfen, ob Datei existiert
-    if not os.path.isfile(env_file):
-        logging.warn(f"Konfigurationsdatei nicht gefunden: {env_file}")
-        return False
-    
-    # Prüfen, ob Datei lesbar ist
-    if not os.access(env_file, os.R_OK):
-        logging.error(f"Konfigurationsdatei ist nicht lesbar: {env_file}")
-        return False
-    
-    # Variablen laden
-    config_dict = {}
-    logging.debug("Konfigurationsdatei wird geparst")
-    
-    with open(env_file, "r") as f:
-        for line in f:
-            line = line.strip()
-            # Kommentare und leere Zeilen überspringen
-            if not line or line.startswith("#"):
-                continue
-                
-            # Schlüssel und Wert trennen
-            if "=" in line:
-                key, value = line.split("=", 1)
-                key = key.strip()
-                value = value.strip()
-                
-                # Anführungszeichen entfernen, wenn vorhanden
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                
-                # Variable in die Umgebung exportieren
-                os.environ[key] = value
-                config_dict[key] = value
-                logging.debug(f"Konfiguration geladen: {key}={value}")
-    
-    logging.success(f"Konfiguration aus {env_file} geladen")
-    return True
+# Check if secrets are generated and generate them if needed (wrapper for backward compatibility)
+def check_secrets() -> bool:
+    """
+    Check if secrets are generated and generate them if needed.
+
+    Returns:
+        bool: True if all required secrets are set, False otherwise
+    """
+    return get_config_manager().check_secrets()
 
 
-# Konfiguration in .env-Datei speichern
-def save_config(env_file: str = ENV_FILE, variables: Optional[List[Tuple[str, str]]] = None) -> bool:
+# Generate secure secrets (wrapper for backward compatibility)
+def generate_secrets() -> bool:
     """
-    Speichert die Konfiguration in einer .env-Datei.
-    
+    Generate secure secrets for the configuration.
+
+    Returns:
+        bool: True if the secrets were successfully generated, False otherwise
+    """
+    return get_config_manager().generate_secrets()
+
+
+# Update LibreChat secrets from the main configuration (wrapper for backward compatibility)
+def update_librechat_secrets() -> bool:
+    """
+    Update LibreChat secrets from the main configuration.
+
+    Returns:
+        bool: True if the secrets were successfully updated, False otherwise
+    """
+    return get_config_manager().update_librechat_secrets()
+
+
+# Create a backup of a configuration file (wrapper for backward compatibility)
+def backup_config_file(file_path: Optional[str] = None) -> Optional[str]:
+    """
+    Create a backup of a configuration file.
+
     Args:
-        env_file: Pfad zur .env-Datei
-        variables: Liste von (Schlüssel, Wert)-Tupeln, die gespeichert werden sollen
-        
+        file_path: Path to the configuration file (defaults to the configured env_file)
+
     Returns:
-        bool: True, wenn die Konfiguration erfolgreich gespeichert wurde, sonst False
+        Optional[str]: Path to the backup file or None if an error occurred
     """
-    logging.debug(f"Speichere Konfiguration in {env_file}")
+    return get_config_manager().backup_config_file(file_path)
+
+
+# Show configuration (wrapper for backward compatibility)
+def show_config() -> None:
+    """Show the current configuration."""
+    get_config_manager().show_config()
+
+
+# Edit configuration (wrapper for backward compatibility)
+def edit_config() -> None:
+    """Open the configuration file in the default editor."""
+    get_config_manager().edit_config()
+    return get_config_manager().load_config(env_file)
+
+
+# Save configuration to .env file
+def save_config(
+    env_file: Optional[str] = None, variables: Optional[List[Tuple[str, str]]] = None
+) -> bool:
+    """
+    Save configuration to an .env file.
+
+    Args:
+        env_file: Path to the .env file (defaults to the configured env_file)
+        variables: List of (key, value) tuples to be saved
+
+    Returns:
+        bool: True if the configuration was successfully saved, False otherwise
+    """
+    config_manager = get_config_manager()
     
-    # Sicherstellen, dass das Konfigurationsverzeichnis existiert
+    if env_file is None:
+        env_file = config_manager.env_file
+        
+    logging.debug(f"Saving configuration to {env_file}")
+
+    # Ensure that the configuration directory exists
     config_dir = os.path.dirname(env_file)
     os.makedirs(config_dir, exist_ok=True)
-    
-    # Backup erstellen, wenn die Datei existiert
+
+    # Create backup if the file exists
     if os.path.isfile(env_file):
         backup_file = backup_config_file(env_file)
         if backup_file:
-            logging.info(f"Backup erstellt: {backup_file}")
+            logging.info(f"Backup created: {backup_file}")
         else:
-            logging.warn("Konnte kein Backup der Konfigurationsdatei erstellen")
-    
-    # Wenn keine Variablen angegeben sind, Datei nicht ändern
+            logging.warn("Could not create backup of configuration file")
+
+    # If no variables are specified, don't change the file
     if not variables:
-        logging.debug("Keine Variablen angegeben, Konfigurationsdatei nicht geändert")
+        logging.debug("No variables specified, configuration file not changed")
         return True
-    
-    # Konfigurationsdatei aktualisieren
+
+    # Update configuration file
     try:
-        # Wenn die Datei nicht existiert, neue Datei erstellen
+        # If the file doesn't exist, create a new file
         if not os.path.isfile(env_file):
             with open(env_file, "w") as f:
                 for key, value in variables:
                     f.write(f"{key}={value}\n")
         else:
-            # Bestehende Datei aktualisieren
+            # Update existing file
             update_env_vars(env_file, variables)
-        
-        logging.success(f"Konfiguration in {env_file} gespeichert")
+
+        # Update the manager's config values
+        if variables:
+            for key, value in variables:
+                config_manager.config_values[key] = value
+                
+        logging.success(f"Configuration saved to {env_file}")
         return True
     except Exception as e:
-        logging.error(f"Fehler beim Speichern der Konfiguration: {str(e)}")
+        logging.error(f"Error saving configuration: {str(e)}")
         return False
 
 
-# Konfigurationswert abrufen
+# Get configuration value with caching (wrapper for backward compatibility)
+@functools.lru_cache(maxsize=128)
 def get_config(key: str, default_value: str = "") -> str:
     """
-    Ruft einen Konfigurationswert ab.
-    
+    Get a configuration value with caching.
+
     Args:
-        key: Schlüssel des Konfigurationswerts
-        default_value: Standardwert, falls der Schlüssel nicht existiert
-        
+        key: Key of the configuration value
+        default_value: Default value if the key doesn't exist
+
     Returns:
-        str: Konfigurationswert oder Standardwert
+        str: Configuration value or default value
     """
-    logging.debug(f"Rufe Konfigurationswert für {key} ab")
-    
-    # Wert aus der Umgebung abrufen
-    value = os.environ.get(key, default_value)
-    
-    return value
+    return get_config_manager().get_config(key, default_value)
 
 
-# Konfigurationswert setzen
+# Set configuration value (wrapper for backward compatibility)
 def set_config(key: str, value: str) -> None:
     """
-    Setzt einen Konfigurationswert.
-    
+    Set a configuration value.
+
     Args:
-        key: Schlüssel des Konfigurationswerts
-        value: Wert, der gesetzt werden soll
+        key: Key of the configuration value
+        value: Value to set
     """
-    logging.debug(f"Setze Konfigurationswert: {key}={value}")
-    
-    # Variable in die Umgebung exportieren
-    os.environ[key] = value
+    get_config_manager().set_config(key, value)
 
 
-# Umgebungsvariablen in einer Datei aktualisieren
+# Update environment variables in a file (wrapper for backward compatibility)
 def update_env_vars(env_file: str, variables: List[Tuple[str, str]]) -> bool:
     """
-    Aktualisiert Umgebungsvariablen in einer .env-Datei.
-    
+    Update environment variables in an .env file.
+
     Args:
-        env_file: Pfad zur .env-Datei
-        variables: Liste von (Schlüssel, Wert)-Tupeln, die aktualisiert werden sollen
-        
+        env_file: Path to the .env file
+        variables: List of (key, value) tuples to be updated
+
     Returns:
-        bool: True, wenn die Aktualisierung erfolgreich war, sonst False
+        bool: True if the update was successful, False otherwise
     """
-    logging.debug(f"Aktualisiere Umgebungsvariablen in {env_file}")
-    
-    # Prüfen, ob Datei existiert und schreibbar ist
-    if not os.path.isfile(env_file):
-        logging.debug(f"Erstelle neue Datei: {env_file}")
-        # Neue Datei mit den Variablen erstellen
-        try:
-            with open(env_file, "w") as f:
-                for key, value in variables:
-                    f.write(f"{key}={value}\n")
-            return True
-        except Exception as e:
-            logging.error(f"Konnte nicht in {env_file} schreiben: {str(e)}")
-            return False
-    
-    # Prüfen, ob Datei schreibbar ist
-    if not os.access(env_file, os.W_OK):
-        logging.error(f"Datei {env_file} ist nicht schreibbar")
-        return False
-    
-    # Temporäre Datei erstellen
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp_file:
-        # Variablen zum Verfolgen, welche Schlüssel gefunden wurden
-        found_keys = set()
-        
-        # Bestehende Datei lesen und aktualisieren
-        with open(env_file, "r") as f:
-            for line in f:
-                line = line.strip()
-                # Kommentare und leere Zeilen beibehalten
-                if not line or line.startswith("#"):
-                    tmp_file.write(f"{line}\n")
-                    continue
-                
-                # Schlüssel und Wert trennen
-                if "=" in line:
-                    key, _ = line.split("=", 1)
-                    key = key.strip()
-                    
-                    # Prüfen, ob der Schlüssel aktualisiert werden soll
-                    for var_key, var_value in variables:
-                        if key == var_key:
-                            tmp_file.write(f"{var_key}={var_value}\n")
-                            found_keys.add(var_key)
-                            break
-                    else:
-                        # Wenn der Schlüssel nicht aktualisiert werden soll, Zeile beibehalten
-                        tmp_file.write(f"{line}\n")
-                else:
-                    # Zeilen ohne "=" beibehalten
-                    tmp_file.write(f"{line}\n")
-        
-        # Nicht gefundene Schlüssel hinzufügen
-        for var_key, var_value in variables:
-            if var_key not in found_keys:
-                tmp_file.write(f"{var_key}={var_value}\n")
-    
-    # Temporäre Datei in die Originaldatei kopieren
-    try:
-        shutil.move(tmp_file.name, env_file)
-        return True
-    except Exception as e:
-        logging.error(f"Konnte {env_file} nicht aktualisieren: {str(e)}")
-        # Temporäre Datei löschen, wenn sie nicht verschoben werden konnte
-        if os.path.exists(tmp_file.name):
-            os.unlink(tmp_file.name)
-        return False
+    return get_config_manager().update_env_vars(env_file, variables)
 
 
-# Konfiguration validieren
+# Validate configuration (wrapper for backward compatibility)
 def validate_config() -> bool:
     """
-    Validiert die Konfiguration.
-    
+    Validate the configuration.
+
     Returns:
-        bool: True, wenn die Konfiguration gültig ist, sonst False
+        bool: True if the configuration is valid, False otherwise
     """
-    logging.debug("Validiere Konfiguration")
-    
-    # Prüfen, ob erforderliche Konfigurationsdateien existieren
-    if not os.path.isfile(ENV_FILE):
-        logging.error(f"Hauptkonfigurationsdatei nicht gefunden: {ENV_FILE}")
-        return False
-    
-    # Port-Konfigurationen validieren
-    host_port_ollama = get_config("HOST_PORT_OLLAMA", "11434")
-    if not host_port_ollama.isdigit():
-        logging.error(f"HOST_PORT_OLLAMA muss eine Zahl sein: {host_port_ollama}")
-        return False
-    
-    host_port_librechat = get_config("HOST_PORT_LIBRECHAT", "3080")
-    if not host_port_librechat.isdigit():
-        logging.error(f"HOST_PORT_LIBRECHAT muss eine Zahl sein: {host_port_librechat}")
-        return False
-    
-    # Ressourcenbeschränkungen validieren
-    ollama_cpu_limit = get_config("OLLAMA_CPU_LIMIT", "0.75")
-    try:
-        float(ollama_cpu_limit)
-    except ValueError:
-        logging.error(f"OLLAMA_CPU_LIMIT muss eine Dezimalzahl sein: {ollama_cpu_limit}")
-        return False
-    
-    # Speicherbeschränkungen validieren (sicherstellen, dass sie das G-Suffix haben)
-    ollama_memory_limit = get_config("OLLAMA_MEMORY_LIMIT", "16G")
-    if not ollama_memory_limit.endswith("G"):
-        logging.error(f"OLLAMA_MEMORY_LIMIT muss im Format '16G' sein: {ollama_memory_limit}")
-        return False
-    
-    # Sicherheitseinstellungen validieren
-    jwt_secret = get_config("JWT_SECRET", "")
-    if not jwt_secret:
-        logging.error("JWT_SECRET ist nicht gesetzt")
-        return False
-    
-    jwt_refresh_secret = get_config("JWT_REFRESH_SECRET", "")
-    if not jwt_refresh_secret:
-        logging.error("JWT_REFRESH_SECRET ist nicht gesetzt")
-        return False
-    
-    logging.success("Konfigurationsvalidierung bestanden")
-    return True
+    return get_config_manager().validate_config()
 
 
-# Prüfen, ob Secrets generiert sind und sie bei Bedarf generieren
+# Check if secrets are generated and generate them if needed (wrapper for backward compatibility)
+@functools.lru_cache(maxsize=1)
 def check_secrets() -> bool:
     """
-    Prüft, ob Secrets generiert sind und generiert sie bei Bedarf.
-    
+    Check if secrets are generated and generate them if needed.
+
     Returns:
-        bool: True, wenn alle erforderlichen Secrets gesetzt sind, sonst False
+        bool: True if all required secrets are set, False otherwise
     """
-    logging.info("Prüfe, ob Secrets generiert sind")
-    
-    # Prüfen, ob config/.env existiert
-    if not os.path.isfile(ENV_FILE):
-        logging.warn("Konfigurationsdatei nicht gefunden. Generiere Secrets...")
-        generate_secrets()
-        return True
-    
-    # Prüfen, ob erforderliche Secrets in der Hauptkonfigurationsdatei leer sind
-    jwt_secret = get_config("JWT_SECRET", "")
-    jwt_refresh_secret = get_config("JWT_REFRESH_SECRET", "")
-    session_secret = get_config("SESSION_SECRET", "")
-    
-    # Auch die LibreChat .env-Datei prüfen, wenn sie existiert
-    librechat_jwt_secret = ""
-    librechat_jwt_refresh_secret = ""
-    librechat_needs_update = False
-    librechat_env = f"{CONFIG_DIR}/librechat/.env"
-    
-    if os.path.isfile(librechat_env):
-        logging.debug("LibreChat .env-Datei gefunden")
-        
-        # LibreChat JWT-Secrets abrufen
-        with open(librechat_env, "r") as f:
-            for line in f:
-                if line.startswith("JWT_SECRET="):
-                    librechat_jwt_secret = line.split("=", 1)[1].strip()
-                elif line.startswith("JWT_REFRESH_SECRET="):
-                    librechat_jwt_refresh_secret = line.split("=", 1)[1].strip()
-        
-        # Prüfen, ob LibreChat-Secrets leer sind
-        if not librechat_jwt_secret:
-            logging.warn("LibreChat JWT_SECRET ist leer")
-            librechat_needs_update = True
-        
-        if not librechat_jwt_refresh_secret:
-            logging.warn("LibreChat JWT_REFRESH_SECRET ist leer")
-            librechat_needs_update = True
-    
-    # Prüfen, ob Hauptsecrets generiert werden müssen
-    if not jwt_secret or not jwt_refresh_secret or not session_secret:
-        logging.warn("Einige erforderliche Secrets sind in der Hauptkonfiguration nicht gesetzt. Generiere Secrets...")
-        generate_secrets()
-    elif librechat_needs_update:
-        logging.warn("LibreChat JWT-Secrets müssen aktualisiert werden. Aktualisiere aus der Hauptkonfiguration...")
-        
-        # LibreChat-Secrets aus der Hauptkonfiguration aktualisieren
-        update_librechat_secrets()
-    else:
-        logging.success("Alle erforderlichen Secrets sind gesetzt")
-    
-    return True
+    return get_config_manager().check_secrets()
 
 
-# Sichere Secrets generieren
+# Generate secure secrets
 def generate_secrets() -> bool:
     """
-    Generiert sichere Secrets für die Konfiguration.
-    
+    Generate secure secrets for the configuration.
+
     Returns:
-        bool: True, wenn die Secrets erfolgreich generiert wurden, sonst False
+        bool: True if the secrets were successfully generated, False otherwise
     """
     import secrets
     import string
+
+    logging.info("Generating secure secrets")
     
-    logging.info("Generiere sichere Secrets")
-    
-    # Backup der aktuellen Konfiguration erstellen, wenn sie existiert
-    if os.path.isfile(ENV_FILE):
+    config_manager = get_config_manager()
+
+    # Create backup of current configuration if it exists
+    if os.path.isfile(config_manager.env_file):
         backup_file = backup_config_file()
         if backup_file:
-            logging.info(f"Backup erstellt: {backup_file}")
-    
-    # Sicherstellen, dass das Konfigurationsverzeichnis existiert
-    os.makedirs(os.path.dirname(ENV_FILE), exist_ok=True)
-    
-    # Zufällige Secrets generieren
-    jwt_secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
-    jwt_refresh_secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
-    session_secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
-    crypt_secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-    creds_key = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-    creds_iv = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
-    admin_password = ''.join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(16))
-    
-    # Variablen für die Konfigurationsdatei
+            logging.info(f"Backup created: {backup_file}")
+
+    # Ensure that the configuration directory exists
+    os.makedirs(os.path.dirname(config_manager.env_file), exist_ok=True)
+
+    # Generate random secrets
+    jwt_secret = "".join(
+        secrets.choice(string.ascii_letters + string.digits) for _ in range(64)
+    )
+    jwt_refresh_secret = "".join(
+        secrets.choice(string.ascii_letters + string.digits) for _ in range(64)
+    )
+    session_secret = "".join(
+        secrets.choice(string.ascii_letters + string.digits) for _ in range(64)
+    )
+    crypt_secret = "".join(
+        secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
+    )
+    creds_key = "".join(
+        secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
+    )
+    creds_iv = "".join(
+        secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
+    )
+    admin_password = "".join(
+        secrets.choice(string.ascii_letters + string.digits + string.punctuation)
+        for _ in range(16)
+    )
+
+    # Variables for the configuration file
     variables = [
         ("JWT_SECRET", jwt_secret),
         ("JWT_REFRESH_SECRET", jwt_refresh_secret),
@@ -465,45 +1413,49 @@ def generate_secrets() -> bool:
         ("CRYPT_SECRET", crypt_secret),
         ("CREDS_KEY", creds_key),
         ("CREDS_IV", creds_iv),
-        ("ADMIN_PASSWORD", admin_password)
+        ("ADMIN_PASSWORD", admin_password),
     ]
-    
-    # Konfigurationsdatei aktualisieren oder erstellen
-    if os.path.isfile(ENV_FILE):
-        # Bestehende Konfiguration aktualisieren
-        update_env_vars(ENV_FILE, variables)
+
+    # Update or create configuration file
+    if os.path.isfile(config_manager.env_file):
+        # Update existing configuration
+        update_env_vars(config_manager.env_file, variables)
     else:
-        # Neue Konfigurationsdatei erstellen
-        with open(ENV_FILE, "w") as f:
+        # Create new configuration file
+        with open(config_manager.env_file, "w") as f:
             for key, value in variables:
                 f.write(f"{key}={value}\n")
-    
-    # LibreChat-Secrets aktualisieren
+
+    # Update LibreChat secrets
     update_librechat_secrets()
-    
-    logging.success("Sichere Secrets generiert")
-    logging.info(f"Admin-Passwort: {admin_password} (speichern Sie dies an einem sicheren Ort)")
-    
+
+    logging.success("Secure secrets generated")
+    logging.info(
+        f"Admin password: {admin_password} (save this in a secure location)"
+    )
+
     return True
 
 
-# LibreChat-Secrets aus der Hauptkonfiguration aktualisieren
+# Update LibreChat secrets from the main configuration
 def update_librechat_secrets() -> bool:
     """
-    Aktualisiert LibreChat-Secrets aus der Hauptkonfiguration.
-    
+    Update LibreChat secrets from the main configuration.
+
     Returns:
-        bool: True, wenn die Secrets erfolgreich aktualisiert wurden, sonst False
+        bool: True if the secrets were successfully updated, False otherwise
     """
-    logging.info("Aktualisiere LibreChat-Secrets aus der Hauptkonfiguration")
+    logging.info("Updating LibreChat secrets from the main configuration")
     
-    # LibreChat .env-Datei
-    librechat_env = f"{CONFIG_DIR}/librechat/.env"
-    
-    # Sicherstellen, dass das LibreChat-Konfigurationsverzeichnis existiert
+    config_manager = get_config_manager()
+
+    # LibreChat .env file
+    librechat_env = f"{config_manager.config_dir}/librechat/.env"
+
+    # Ensure that the LibreChat configuration directory exists
     os.makedirs(os.path.dirname(librechat_env), exist_ok=True)
-    
-    # Secrets aus der Hauptkonfiguration abrufen
+
+    # Get secrets from the main configuration
     jwt_secret = get_config("JWT_SECRET", "")
     jwt_refresh_secret = get_config("JWT_REFRESH_SECRET", "")
     session_secret = get_config("SESSION_SECRET", "")
@@ -511,8 +1463,8 @@ def update_librechat_secrets() -> bool:
     creds_key = get_config("CREDS_KEY", "")
     creds_iv = get_config("CREDS_IV", "")
     admin_password = get_config("ADMIN_PASSWORD", "")
-    
-    # Variablen für die LibreChat-Konfigurationsdatei
+
+    # Variables for the LibreChat configuration file
     variables = [
         ("JWT_SECRET", jwt_secret),
         ("JWT_REFRESH_SECRET", jwt_refresh_secret),
@@ -520,73 +1472,64 @@ def update_librechat_secrets() -> bool:
         ("CRYPT_SECRET", crypt_secret),
         ("CREDS_KEY", creds_key),
         ("CREDS_IV", creds_iv),
-        ("ADMIN_PASSWORD", admin_password)
+        ("ADMIN_PASSWORD", admin_password),
     ]
-    
-    # LibreChat-Konfigurationsdatei aktualisieren oder erstellen
+
+    # Update or create LibreChat configuration file
     if os.path.isfile(librechat_env):
-        # Backup erstellen
+        # Create backup
         backup_file = backup_config_file(librechat_env)
         if backup_file:
-            logging.info(f"Backup erstellt: {backup_file}")
-        
-        # Bestehende Konfiguration aktualisieren
+            logging.info(f"Backup created: {backup_file}")
+
+        # Update existing configuration
         update_env_vars(librechat_env, variables)
     else:
-        # Neue Konfigurationsdatei erstellen
+        # Create new configuration file
         with open(librechat_env, "w") as f:
             for key, value in variables:
                 f.write(f"{key}={value}\n")
-    
-    logging.success("LibreChat-Secrets aktualisiert")
+
+    logging.success("LibreChat secrets updated")
     return True
 
 
-# Backup einer Konfigurationsdatei erstellen
-def backup_config_file(file_path: str = ENV_FILE) -> Optional[str]:
+# Create a backup of a configuration file (wrapper for backward compatibility)
+def backup_config_file(file_path: Optional[str] = None) -> Optional[str]:
     """
-    Erstellt ein Backup einer Konfigurationsdatei.
-    
+    Create a backup of a configuration file.
+
     Args:
-        file_path: Pfad zur Konfigurationsdatei
-        
+        file_path: Path to the configuration file (defaults to the configured env_file)
+
     Returns:
-        Optional[str]: Pfad zur Backup-Datei oder None, wenn ein Fehler aufgetreten ist
+        Optional[str]: Path to the backup file or None if an error occurred
     """
-    if not os.path.isfile(file_path):
-        logging.error(f"Datei nicht gefunden: {file_path}")
-        return None
-    
-    # Backup-Dateinamen mit Zeitstempel erstellen
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    backup_path = f"{file_path}.{timestamp}.bak"
-    
-    try:
-        shutil.copy2(file_path, backup_path)
-        return backup_path
-    except Exception as e:
-        logging.error(f"Fehler beim Erstellen des Backups: {str(e)}")
-        return None
+    return get_config_manager().backup_config_file(file_path)
 
 
-# Konfiguration anzeigen
+# Show configuration
 def show_config() -> None:
-    """Zeigt die aktuelle Konfiguration an."""
-    if os.path.isfile(ENV_FILE):
-        with open(ENV_FILE, "r") as f:
+    """Show the current configuration."""
+    config_manager = get_config_manager()
+    
+    if os.path.isfile(config_manager.env_file):
+        with open(config_manager.env_file) as f:
             print(f.read())
     else:
-        logging.error(f"Konfigurationsdatei nicht gefunden: {ENV_FILE}")
+        logging.error(f"Configuration file not found: {config_manager.env_file}")
 
 
-# Konfiguration bearbeiten
+# Edit configuration
 def edit_config() -> None:
-    """Öffnet die Konfigurationsdatei im Standardeditor."""
+    """Open the configuration file in the default editor."""
+    config_manager = get_config_manager()
+    
     editor = os.environ.get("EDITOR", "nano")
-    subprocess.run([editor, ENV_FILE])
+    subprocess.run([editor, config_manager.env_file])
 
 
-# Konfiguration initialisieren
+# Initialize configuration
 init_config()
 
-logging.debug("Konfigurationsmodul initialisiert")
+logging.debug("Configuration module initialized")

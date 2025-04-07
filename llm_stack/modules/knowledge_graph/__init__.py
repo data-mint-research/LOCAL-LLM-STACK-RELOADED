@@ -1,5 +1,5 @@
 """
-Knowledge Graph Modul für den LLM Stack.
+Knowledge Graph Module for the LLM Stack.
 
-Dieses Modul stellt Funktionen zur Integration des neo4j-Knowledge-Graphs bereit.
+This module provides functions for integrating the neo4j Knowledge Graph.
 """

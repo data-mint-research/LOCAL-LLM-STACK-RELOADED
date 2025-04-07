@@ -1,6 +1,6 @@
 """
-Module für den LLM Stack.
+Modules for the LLM Stack.
 
-Dieses Paket enthält erweiterbare Module für den LLM Stack, wie
-Monitoring, Skalierung, Sicherheit und Snapshot-Funktionalität.
+This package contains extensible modules for the LLM Stack, such as
+Monitoring, Scaling, Security, and Snapshot functionality.
 """

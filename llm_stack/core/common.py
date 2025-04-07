@@ -1,8 +1,8 @@
 """
-Gemeinsame Funktionen für den LLM Stack CLI.
+Common functions for the LLM Stack CLI.
 
-Dieses Modul stellt gemeinsame Funktionen für die LLM Stack CLI bereit,
-die von verschiedenen Befehlen verwendet werden.
+This module provides common functions for the LLM Stack CLI
+that are used by various commands.
 """
 
 import os
@@ -17,408 +17,466 @@ from llm_stack.core import config, docker, error, logging, system
 from llm_stack.knowledge_graph import client as kg_client
 from llm_stack.modules.knowledge_graph.module import get_module as get_kg_module
 
-# Konsole für formatierte Ausgabe
-console = Console()
+# Console for formatted output
+CONSOLE = Console()
 
-# Knowledge Graph Modul
-kg_module = None
+# Knowledge Graph module
+KG_MODULE = None
 try:
-    kg_module = get_kg_module()
+    KG_MODULE = get_kg_module()
 except ImportError:
-    logging.debug("Knowledge Graph Modul nicht verfügbar")
+    logging.debug("Knowledge Graph module not available")
 
 
-# Start-Befehl-Implementierung mit verbessertem Benutzerfeedback
-def start_command(component: Optional[str] = None, module: Optional[str] = None) -> bool:
+# Start command implementation with improved user feedback
+def start_command(
+    component: Optional[str] = None, module: Optional[str] = None
+) -> bool:
     """
-    Implementiert den Start-Befehl.
-    
+    Implements the start command.
+
     Args:
-        component: Name der zu startenden Komponente
-        module: Name des zu startenden Moduls
-        
+        component: Name of the component to start
+        module: Name of the module to start
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
     if component is None and module is None:
-        logging.info("Starte alle Komponenten...")
-        # Prüfen, ob Secrets generiert sind
+        logging.info("Starting all components...")
+        # Check if secrets are generated
         config.check_secrets()
         if not docker.compose_up(config.CORE_PROJECT, config.CORE_COMPOSE, ""):
             return False
-        logging.success("Kernkomponenten erfolgreich gestartet.")
-        logging.info("Tipp: Verwenden Sie 'llm status', um den Komponentenstatus zu prüfen")
+        logging.success("Core components successfully started.")
+        logging.info(
+            "Tip: Use 'llm status' to check component status"
+        )
         return True
     elif module is not None:
         if not os.path.isdir(f"modules/{module}"):
-            logging.error(f"Modul nicht gefunden: {module}")
+            logging.error(f"Module not found: {module}")
             return False
 
-        logging.info(f"Starte Kernkomponenten mit {module} Modul...")
+        logging.info(f"Starting core components with {module} module...")
         if not docker.compose_up(config.CORE_PROJECT, config.CORE_COMPOSE, ""):
             return False
-        if not docker.compose_up(f"{config.CORE_PROJECT}-{module}", f"-f modules/{module}/docker-compose.yml", ""):
+        if not docker.compose_up(
+            f"{config.CORE_PROJECT}-{module}",
+            f"-f modules/{module}/docker-compose.yml",
+            "",
+        ):
             return False
-        logging.success(f"Kernkomponenten und {module} Modul erfolgreich gestartet.")
-        logging.info("Tipp: Verwenden Sie 'llm status', um den Komponentenstatus zu prüfen")
+        logging.success(f"Core components and {module} module successfully started.")
+        logging.info(
+            "Tip: Use 'llm status' to check component status"
+        )
         return True
     else:
-        logging.info(f"Starte {component} Komponente...")
-        if not docker.compose_up(f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", ""):
+        logging.info(f"Starting {component} component...")
+        if not docker.compose_up(
+            f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", ""
+        ):
             return False
-        logging.success(f"{component} Komponente erfolgreich gestartet.")
+        logging.success(f"{component} component successfully started.")
         return True
 
 
-# Stop-Befehl-Implementierung mit verbessertem Benutzerfeedback
+# Stop command implementation with improved user feedback
 def stop_command(component: Optional[str] = None, module: Optional[str] = None) -> bool:
     """
-    Implementiert den Stop-Befehl.
-    
+    Implements the stop command.
+
     Args:
-        component: Name der zu stoppenden Komponente
-        module: Name des zu stoppenden Moduls
-        
+        component: Name of the component to stop
+        module: Name of the module to stop
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
     if component is None and module is None:
-        logging.info("Stoppe alle Komponenten...")
+        logging.info("Stopping all components...")
         if not docker.compose_down(config.CORE_PROJECT, config.CORE_COMPOSE, ""):
             return False
-        logging.success("Alle Komponenten erfolgreich gestoppt.")
+        logging.success("All components successfully stopped.")
         return True
     elif module is not None:
         if not os.path.isdir(f"modules/{module}"):
-            logging.error(f"Modul nicht gefunden: {module}")
+            logging.error(f"Module not found: {module}")
             return False
 
-        logging.info(f"Stoppe Kernkomponenten und {module} Modul...")
-        if not docker.compose_down(f"{config.CORE_PROJECT}-{module}", f"-f modules/{module}/docker-compose.yml", ""):
+        logging.info(f"Stopping core components and {module} module...")
+        if not docker.compose_down(
+            f"{config.CORE_PROJECT}-{module}",
+            f"-f modules/{module}/docker-compose.yml",
+            "",
+        ):
             return False
         if not docker.compose_down(config.CORE_PROJECT, config.CORE_COMPOSE, ""):
             return False
-        logging.success(f"Kernkomponenten und {module} Modul erfolgreich gestoppt.")
+        logging.success(f"Core components and {module} module successfully stopped.")
         return True
     else:
-        logging.info(f"Stoppe {component} Komponente...")
-        if not docker.compose_down(f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", ""):
+        logging.info(f"Stopping {component} component...")
+        if not docker.compose_down(
+            f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", ""
+        ):
             return False
-        logging.success(f"{component} Komponente erfolgreich gestoppt.")
+        logging.success(f"{component} component successfully stopped.")
         return True
 
 
-# Debug-Befehl-Implementierung mit verbesserter Benutzerführung
+# Debug command implementation with improved user guidance
 def debug_command(component: Optional[str] = None) -> bool:
     """
-    Implementiert den Debug-Befehl.
-    
+    Implements the debug command.
+
     Args:
-        component: Name der zu debuggenden Komponente
-        
+        component: Name of the component to debug
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
     if component is None:
-        logging.info("Starte alle Komponenten im Debug-Modus...")
-        # Prüfen, ob Secrets generiert sind
+        logging.info("Starting all components in debug mode...")
+        # Check if secrets are generated
         config.check_secrets()
         if not docker.compose_up(config.DEBUG_PROJECT, config.DEBUG_COMPOSE, ""):
             return False
-        logging.success("Kernkomponenten im Debug-Modus gestartet.")
-        logging.info("LibreChat Node.js-Debugger ist verfügbar unter localhost:9229")
-        logging.info("Tipp: Verwenden Sie VSCode's 'Attach to LibreChat' Debug-Konfiguration zum Verbinden")
+        logging.success("Core components started in debug mode.")
+        logging.info("LibreChat Node.js debugger is available at localhost:9229")
+        logging.info(
+            "Tip: Use VSCode's 'Attach to LibreChat' debug configuration to connect"
+        )
         return True
     elif component == "librechat":
-        logging.info("Starte LibreChat im Debug-Modus...")
-        if not docker.compose_up(config.DEBUG_PROJECT, config.DEBUG_COMPOSE, "librechat"):
+        logging.info("Starting LibreChat in debug mode...")
+        if not docker.compose_up(
+            config.DEBUG_PROJECT, config.DEBUG_COMPOSE, "librechat"
+        ):
             return False
-        logging.success("LibreChat im Debug-Modus gestartet.")
-        logging.info("Node.js-Debugger ist verfügbar unter localhost:9229")
-        logging.info("Tipp: Verwenden Sie VSCode's 'Attach to LibreChat' Debug-Konfiguration zum Verbinden")
+        logging.success("LibreChat started in debug mode.")
+        logging.info("Node.js debugger is available at localhost:9229")
+        logging.info(
+            "Tip: Use VSCode's 'Attach to LibreChat' debug configuration to connect"
+        )
         return True
     else:
-        logging.error("Debug-Modus wird derzeit nur für LibreChat unterstützt.")
-        logging.info("Verwendung: llm debug [librechat]")
+        logging.error("Debug mode is currently only supported for LibreChat.")
+        logging.info("Usage: llm debug [librechat]")
         return False
 
 
-# Status-Befehl-Implementierung mit verbesserter Formatierung
+# Status command implementation with improved formatting
 def status_command() -> bool:
     """
-    Implementiert den Status-Befehl.
-    
-    Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
-    """
-    logging.info("Prüfe Status aller Komponenten...")
+    Implements the status command.
 
-    # Container-Status mit besserer Formatierung abrufen
+    Returns:
+        bool: True if the command was executed successfully, False otherwise
+    """
+    logging.info("Checking status of all components...")
+
+    # Get container status with better formatting
     docker.show_container_status()
 
-    # Hilfreiche Tipps anzeigen
-    # Port-Werte mit Fallbacks abrufen
+    # Display helpful tips
+    # Get port values with fallbacks
     librechat_port = config.get_config("HOST_PORT_LIBRECHAT", "3080")
     ollama_port = config.get_config("HOST_PORT_OLLAMA", "11434")
 
-    console.print()
-    logging.info(f"Tipp: Zugriff auf LibreChat unter http://localhost:{librechat_port}")
-    logging.info(f"Tipp: Ollama API ist verfügbar unter http://localhost:{ollama_port}")
-    
+    CONSOLE.print()
+    logging.info(f"Tip: Access LibreChat at http://localhost:{librechat_port}")
+    logging.info(f"Tip: Ollama API is available at http://localhost:{ollama_port}")
+
     return True
 
 
-# Models-Befehl-Implementierung mit verbesserter Benutzerführung
+# Models command implementation with improved user guidance
 def models_command(action: str, model: Optional[str] = None) -> bool:
     """
-    Implementiert den Models-Befehl.
-    
+    Implements the models command.
+
     Args:
-        action: Auszuführende Aktion (list, add, remove)
-        model: Name des Modells
-        
+        action: Action to perform (list, add, remove)
+        model: Name of the model
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
     from llm_stack.core import models as models_module
-    
-    # Ollama-Port mit Fallback abrufen
+
+    # Get Ollama port with fallback
     ollama_port = config.get_config("HOST_PORT_OLLAMA", "11434")
     ollama_url = f"http://localhost:{ollama_port}"
-    
-    # Prüfen, ob Ollama läuft
+
+    # Check if Ollama is running
     if not models_module.check_ollama_running(ollama_url):
-        logging.error("Ollama-Dienst läuft nicht.")
-        logging.info("Tipp: Starten Sie Ollama zuerst mit 'llm start ollama'")
+        logging.error("Ollama service is not running.")
+        logging.info("Tip: Start Ollama first with 'llm start ollama'")
         return False
-    
+
     if action == "list":
         models_module.list_models(ollama_url)
         return True
     elif action == "add":
         if model is None:
-            logging.error("Modellname ist für die Aktion 'add' erforderlich")
+            logging.error("Model name is required for the 'add' action")
             return False
         return models_module.add_model(ollama_url, model)
     elif action == "remove":
         if model is None:
-            logging.error("Modellname ist für die Aktion 'remove' erforderlich")
+            logging.error("Model name is required for the 'remove' action")
             return False
         return models_module.remove_model(ollama_url, model)
     else:
-        logging.info("Verwendung: llm models [list|add|remove] [model_name]")
-        console.print()
-        console.print("Beispiele:")
-        console.print("  llm models list           Liste aller verfügbaren Modelle")
-        console.print("  llm models add llama3     Füge das Llama 3 Modell hinzu")
-        console.print("  llm models remove mistral Entferne das Mistral Modell")
+        logging.info("Usage: llm models [list|add|remove] [model_name]")
+        CONSOLE.print()
+        CONSOLE.print("Examples:")
+        CONSOLE.print("  llm models list           List all available models")
+        CONSOLE.print("  llm models add llama3     Add the Llama 3 model")
+        CONSOLE.print("  llm models remove mistral Remove the Mistral model")
         return False
 
 
-# Config-Befehl-Implementierung mit verbesserter Benutzerführung
+# Config command implementation with improved user guidance
 def config_command(action: str) -> bool:
     """
-    Implementiert den Config-Befehl.
-    
+    Implements the config command.
+
     Args:
-        action: Auszuführende Aktion (show, edit)
-        
+        action: Action to perform (show, edit)
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
     if action == "show":
-        logging.info("Zeige Konfiguration...")
+        logging.info("Showing configuration...")
         config.show_config()
-        
-        # Hilfreiche Tipps anzeigen
-        console.print()
-        logging.info("Tipp: Bearbeiten Sie die Konfiguration mit 'llm config edit'")
+
+        # Display helpful tips
+        CONSOLE.print()
+        logging.info("Tip: Edit the configuration with 'llm config edit'")
         return True
     elif action == "edit":
-        logging.info("Erstelle Backup der Konfiguration...")
+        logging.info("Creating backup of configuration...")
         backup_file = config.backup_config_file()
         if backup_file is None:
-            logging.error("Fehler beim Erstellen eines Backups der Konfigurationsdatei")
+            logging.error("Error creating backup of configuration file")
             return False
-        
-        logging.info("Bearbeite Konfiguration...")
+
+        logging.info("Editing configuration...")
         config.edit_config()
-        
-        logging.warn("Hinweis: Wenn Sie einen Fehler gemacht haben, können Sie vom Backup wiederherstellen:")
+
+        logging.warn(
+            "Note: If you made a mistake, you can restore from backup:"
+        )
         logging.warn(f"cp {backup_file} {config.ENV_FILE}")
         return True
     else:
-        logging.info("Verwendung: llm config [show|edit]")
+        logging.info("Usage: llm config [show|edit]")
         console.print()
-        console.print("Beispiele:")
-        console.print("  llm config show    Zeige aktuelle Konfiguration")
-        console.print("  llm config edit    Bearbeite Konfiguration in deinem Standardeditor")
+        console.print("Examples:")
+        console.print("  llm config show    Show current configuration")
+        console.print(
+            "  llm config edit    Edit configuration in your default editor"
+        )
         return False
 
 
-# Generate-Secrets-Befehl-Implementierung mit verbesserter Benutzerführung
+# Generate-Secrets command implementation with improved user guidance
 def generate_secrets_command() -> bool:
     """
-    Implementiert den Generate-Secrets-Befehl.
-    
+    Implements the generate-secrets command.
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
-    # Die Core-Bibliotheksfunktion verwenden
+    # Use the core library function
     return config.generate_secrets()
 
 
-# Befehle und Beschreibungen als Dictionary
+# Commands and descriptions as dictionary
 COMMANDS = {
-    "start": "Starte den Stack oder bestimmte Komponenten",
-    "stop": "Stoppe den Stack oder bestimmte Komponenten",
-    "status": "Zeige Status aller Komponenten",
-    "debug": "Starte Komponenten im Debug-Modus",
-    "models": "Verwalte Modelle",
-    "config": "Zeige/bearbeite Konfiguration",
-    "generate-secrets": "Generiere sichere Secrets für die Konfiguration",
-    "help": "Zeige Hilfe für einen Befehl",
+    "start": "Start the stack or specific components",
+    "stop": "Stop the stack or specific components",
+    "status": "Show status of all components",
+    "debug": "Start components in debug mode",
+    "models": "Manage models",
+    "config": "Show/edit configuration",
+    "generate-secrets": "Generate secure secrets for configuration",
+    "help": "Show help for a command",
 }
 
 
-# Help-Befehl-Implementierung mit verbesserter Formatierung
+# Help command implementation with improved formatting
 def help_command(command: Optional[str] = None) -> bool:
     """
-    Implementiert den Help-Befehl.
-    
+    Implements the help command.
+
     Args:
-        command: Name des Befehls, für den Hilfe angezeigt werden soll
-        
+        command: Name of the command for which help should be displayed
+
     Returns:
-        bool: True, wenn der Befehl erfolgreich ausgeführt wurde, sonst False
+        bool: True if the command was executed successfully, False otherwise
     """
     if command is None:
-        console.print("Verwendung: llm [command] [options]")
-        console.print()
-        console.print("Befehle:")
-        # Befehle für konsistente Anzeige sortieren
+        CONSOLE.print("Usage: llm [command] [options]")
+        CONSOLE.print()
+        CONSOLE.print("Commands:")
+        # Sort commands for consistent display
         for cmd in sorted(COMMANDS.keys()):
-            console.print(f"  {cmd:<15} {COMMANDS[cmd]}")
-        console.print()
-        console.print("Führen Sie 'llm help [command]' aus, um weitere Informationen zu einem Befehl zu erhalten.")
+            CONSOLE.print(f"  {cmd:<15} {COMMANDS[cmd]}")
+        CONSOLE.print()
+        CONSOLE.print(
+            "Run 'llm help [command]' to get more information about a command."
+        )
         return True
-    
+
     if command == "start":
-        console.print("Verwendung: llm start [component|--with module]")
-        console.print()
-        console.print("Starte den Stack oder bestimmte Komponenten.")
-        console.print()
-        console.print("Optionen:")
-        console.print("  component       Name der zu startenden Komponente (z.B. ollama, librechat)")
-        console.print("  --with module   Starte mit einem bestimmten Modul (z.B. monitoring, security)")
-        console.print()
-        console.print("Beispiele:")
-        console.print("  llm start                 Starte alle Komponenten")
-        console.print("  llm start ollama          Starte nur die Ollama-Komponente")
-        console.print("  llm start --with monitoring  Starte mit dem Monitoring-Modul")
+        CONSOLE.print("Usage: llm start [component|--with module]")
+        CONSOLE.print()
+        CONSOLE.print("Start the stack or specific components.")
+        CONSOLE.print()
+        CONSOLE.print("Options:")
+        CONSOLE.print(
+            "  component       Name of the component to start (e.g., ollama, librechat)"
+        )
+        CONSOLE.print(
+            "  --with module   Start with a specific module (e.g., monitoring, security)"
+        )
+        CONSOLE.print()
+        CONSOLE.print("Examples:")
+        CONSOLE.print("  llm start                 Start all components")
+        CONSOLE.print("  llm start ollama          Start only the Ollama component")
+        CONSOLE.print("  llm start --with monitoring  Start with the monitoring module")
     elif command == "stop":
-        console.print("Verwendung: llm stop [component|--with module]")
-        console.print()
-        console.print("Stoppe den Stack oder bestimmte Komponenten.")
-        console.print()
-        console.print("Optionen:")
-        console.print("  component       Name der zu stoppenden Komponente (z.B. ollama, librechat)")
-        console.print("  --with module   Stoppe mit einem bestimmten Modul (z.B. monitoring, security)")
-        console.print()
-        console.print("Beispiele:")
-        console.print("  llm stop                  Stoppe alle Komponenten")
-        console.print("  llm stop librechat        Stoppe nur die LibreChat-Komponente")
-        console.print("  llm stop --with monitoring  Stoppe Kernkomponenten und Monitoring-Modul")
+        CONSOLE.print("Usage: llm stop [component|--with module]")
+        CONSOLE.print()
+        CONSOLE.print("Stop the stack or specific components.")
+        CONSOLE.print()
+        CONSOLE.print("Options:")
+        CONSOLE.print(
+            "  component       Name of the component to stop (e.g., ollama, librechat)"
+        )
+        CONSOLE.print(
+            "  --with module   Stop with a specific module (e.g., monitoring, security)"
+        )
+        CONSOLE.print()
+        CONSOLE.print("Examples:")
+        CONSOLE.print("  llm stop                  Stop all components")
+        CONSOLE.print("  llm stop librechat        Stop only the LibreChat component")
+        CONSOLE.print(
+            "  llm stop --with monitoring  Stop core components and monitoring module"
+        )
     elif command == "status":
-        console.print("Verwendung: llm status")
-        console.print()
-        console.print("Zeige Status aller Komponenten.")
-        console.print()
-        console.print("Dieser Befehl zeigt den Status aller laufenden Container an,")
-        console.print("einschließlich ihrer Namen, Status und exponierten Ports.")
+        CONSOLE.print("Usage: llm status")
+        CONSOLE.print()
+        CONSOLE.print("Show status of all components.")
+        CONSOLE.print()
+        CONSOLE.print("This command shows the status of all running containers,")
+        CONSOLE.print("including their names, status, and exposed ports.")
     elif command == "debug":
-        console.print("Verwendung: llm debug [component]")
-        console.print()
-        console.print("Starte Komponenten im Debug-Modus.")
-        console.print()
-        console.print("Optionen:")
-        console.print("  component       Name der zu debuggenden Komponente (derzeit wird nur 'librechat' unterstützt)")
-        console.print()
-        console.print("Beispiele:")
-        console.print("  llm debug                Starte alle Komponenten im Debug-Modus")
-        console.print("  llm debug librechat      Starte nur LibreChat im Debug-Modus")
-        console.print()
-        console.print("Im Debug-Modus ist der Node.js-Debugger unter localhost:9229 verfügbar.")
-        console.print("Sie können sich mit VSCode's 'Attach to LibreChat' Debug-Konfiguration verbinden.")
+        CONSOLE.print("Usage: llm debug [component]")
+        CONSOLE.print()
+        CONSOLE.print("Start components in debug mode.")
+        CONSOLE.print()
+        CONSOLE.print("Options:")
+        CONSOLE.print(
+            "  component       Name of the component to debug (currently only 'librechat' is supported)"
+        )
+        CONSOLE.print()
+        CONSOLE.print("Examples:")
+        CONSOLE.print(
+            "  llm debug                Start all components in debug mode"
+        )
+        CONSOLE.print("  llm debug librechat      Start only LibreChat in debug mode")
+        CONSOLE.print()
+        CONSOLE.print(
+            "In debug mode, the Node.js debugger is available at localhost:9229."
+        )
+        CONSOLE.print(
+            "You can connect with VSCode's 'Attach to LibreChat' debug configuration."
+        )
     elif command == "models":
-        console.print("Verwendung: llm models [list|add|remove] [model_name]")
-        console.print()
-        console.print("Verwalte Modelle.")
-        console.print()
-        console.print("Aktionen:")
-        console.print("  list            Liste verfügbarer Modelle")
-        console.print("  add model_name  Füge ein neues Modell hinzu")
-        console.print("  remove model_name Entferne ein Modell")
-        console.print()
-        console.print("Beispiele:")
-        console.print("  llm models list           Liste aller verfügbaren Modelle")
-        console.print("  llm models add llama3     Füge das Llama 3 Modell hinzu")
-        console.print("  llm models remove mistral Entferne das Mistral Modell")
+        CONSOLE.print("Usage: llm models [list|add|remove] [model_name]")
+        CONSOLE.print()
+        CONSOLE.print("Manage models.")
+        CONSOLE.print()
+        CONSOLE.print("Actions:")
+        CONSOLE.print("  list            List available models")
+        CONSOLE.print("  add model_name  Add a new model")
+        CONSOLE.print("  remove model_name Remove a model")
+        CONSOLE.print()
+        CONSOLE.print("Examples:")
+        CONSOLE.print("  llm models list           List all available models")
+        CONSOLE.print("  llm models add llama3     Add the Llama 3 model")
+        CONSOLE.print("  llm models remove mistral Remove the Mistral model")
     elif command == "config":
-        console.print("Verwendung: llm config [show|edit]")
-        console.print()
-        console.print("Zeige oder bearbeite Konfiguration.")
-        console.print()
-        console.print("Aktionen:")
-        console.print("  show            Zeige aktuelle Konfiguration")
-        console.print("  edit            Bearbeite Konfiguration in deinem Standardeditor")
-        console.print()
-        console.print("Beispiele:")
-        console.print("  llm config show    Zeige aktuelle Konfiguration")
-        console.print("  llm config edit    Bearbeite Konfiguration in deinem Standardeditor")
+        CONSOLE.print("Usage: llm config [show|edit]")
+        CONSOLE.print()
+        CONSOLE.print("Show or edit configuration.")
+        CONSOLE.print()
+        CONSOLE.print("Actions:")
+        CONSOLE.print("  show            Show current configuration")
+        CONSOLE.print(
+            "  edit            Edit configuration in your default editor"
+        )
+        CONSOLE.print()
+        CONSOLE.print("Examples:")
+        CONSOLE.print("  llm config show    Show current configuration")
+        CONSOLE.print(
+            "  llm config edit    Edit configuration in your default editor"
+        )
     elif command == "generate-secrets":
-        console.print("Verwendung: llm generate-secrets")
-        console.print()
-        console.print("Generiere sichere zufällige Secrets für die Konfiguration.")
-        console.print()
-        console.print("Dieser Befehl wird:")
-        console.print("  1. Ein Backup der aktuellen Konfiguration erstellen")
-        console.print("  2. Sichere zufällige Werte für alle Secret-Felder generieren")
-        console.print("  3. Die Konfigurationsdatei mit diesen Werten aktualisieren")
-        console.print("  4. Das Admin-Passwort anzeigen (speichern Sie dies an einem sicheren Ort)")
+        CONSOLE.print("Usage: llm generate-secrets")
+        CONSOLE.print()
+        CONSOLE.print("Generate secure random secrets for the configuration.")
+        CONSOLE.print()
+        CONSOLE.print("This command will:")
+        CONSOLE.print("  1. Create a backup of the current configuration")
+        CONSOLE.print("  2. Generate secure random values for all secret fields")
+        CONSOLE.print("  3. Update the configuration file with these values")
+        CONSOLE.print(
+            "  4. Display the admin password (save this in a secure location)"
+        )
     else:
-        console.print(f"Unbekannter Befehl: {command}")
-        console.print("Führen Sie 'llm help' aus, um eine Liste verfügbarer Befehle zu erhalten.")
+        CONSOLE.print(f"Unknown command: {command}")
+        CONSOLE.print(
+            "Run 'llm help' to get a list of available commands."
+        )
         return False
-    
+
     return True
 
 
-# Konfiguration laden
+# Load configuration
 config.load_config()
 
-# Migrationsentscheidung im Knowledge Graph aufzeichnen
-if kg_module:
+# Record migration decision in Knowledge Graph
+if KG_MODULE:
     try:
-        kg_module.record_migration_decision(
-            decision="common.sh nach Python migrieren",
-            rationale="Bessere Typsicherheit, Modularität und Wartbarkeit durch Verwendung von Python-Klassen und -Funktionen",
+        KG_MODULE.record_migration_decision(
+            decision="Migrate common.sh to Python",
+            rationale="Better type safety, modularity, and maintainability through the use of Python classes and functions",
             bash_file_path="lib/common.sh",
             python_file_path="llm_stack/core/common.py",
-            alternatives=["Bash-Skript beibehalten", "Teilweise Migration"],
-            impact="Verbesserte Codequalität, bessere Testbarkeit und einfachere Erweiterbarkeit"
+            alternatives=["Keep Bash script", "Partial migration"],
+            impact="Improved code quality, better testability, and easier extensibility",
         )
-        
-        # Bash-Datei im Knowledge Graph aufzeichnen
-        with open("local-llm-stack/lib/common.sh", "r") as f:
-            bash_content = f.read()
-            kg_module.record_bash_file("lib/common.sh", bash_content)
-        
-        # Python-Datei im Knowledge Graph aufzeichnen
-        with open(__file__, "r") as f:
-            python_content = f.read()
-            kg_module.record_python_file("llm_stack/core/common.py", python_content, "lib/common.sh")
-    except Exception as e:
-        logging.debug(f"Fehler beim Aufzeichnen der Migrationsentscheidung: {str(e)}")
 
-logging.debug("Common-Funktionen-Modul initialisiert")
+        # Record Bash file in Knowledge Graph
+        with open("local-llm-stack/lib/common.sh") as f:
+            bash_content = f.read()
+            KG_MODULE.record_bash_file("lib/common.sh", bash_content)
+
+        # Record Python file in Knowledge Graph
+        with open(__file__) as f:
+            python_content = f.read()
+            KG_MODULE.record_python_file(
+                "llm_stack/core/common.py", python_content, "lib/common.sh"
+            )
+    except Exception as e:
+        logging.debug(f"Error recording migration decision: {str(e)}")
+
+logging.debug("Common functions module initialized")

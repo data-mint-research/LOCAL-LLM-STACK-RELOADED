@@ -1,8 +1,8 @@
 """
-Schema für den LLM Stack Knowledge Graph.
+Schema for the LLM Stack Knowledge Graph.
 
-Dieses Modul definiert das Schema für den neo4j-Knowledge-Graph
-basierend auf dem bestehenden JSON-LD-Schema.
+This module defines the schema for the neo4j Knowledge Graph
+based on the existing JSON-LD schema.
 """
 
 from enum import Enum
@@ -13,16 +13,16 @@ from llm_stack.knowledge_graph.client import Neo4jClient, get_client
 
 
 class NodeLabel(str, Enum):
-    """Labels für Knoten im Knowledge Graph."""
-    
-    # Basisklassen
+    """Labels for nodes in the Knowledge Graph."""
+
+    # Base classes
     ENTITY = "Entity"
     COMPONENT = "Component"
     RELATIONSHIP = "Relationship"
     INTERFACE = "Interface"
     DATA_FLOW = "DataFlow"
-    
-    # Komponententypen
+
+    # Component types
     CONTAINER = "Container"
     SCRIPT = "Script"
     LIBRARY = "Library"
@@ -32,8 +32,8 @@ class NodeLabel(str, Enum):
     PARAMETER = "Parameter"
     CONFIG_PARAM = "ConfigParam"
     SERVICE = "Service"
-    
-    # Beziehungstypen
+
+    # Relationship types
     DEPENDS_ON = "DependsOn"
     CALLS = "Calls"
     IMPORTS = "Imports"
@@ -44,17 +44,17 @@ class NodeLabel(str, Enum):
     STARTUP_DEPENDENCY = "StartupDependency"
     RUNTIME_DEPENDENCY = "RuntimeDependency"
     CONFIGURATION_DEPENDENCY = "ConfigurationDependency"
-    
-    # Schnittstellentypen
+
+    # Interface types
     API = "API"
     CLI = "CLI"
     API_ENDPOINT = "APIEndpoint"
     CLI_COMMAND = "CLICommand"
-    
-    # Datenflusstypen
+
+    # Data flow types
     DATA_FLOW_STEP = "DataFlowStep"
-    
-    # Migrationstypen
+
+    # Migration types
     MIGRATION_DECISION = "MigrationDecision"
     CODE_TRANSFORMATION = "CodeTransformation"
     PYTHON_EQUIVALENT = "PythonEquivalent"
@@ -62,9 +62,9 @@ class NodeLabel(str, Enum):
 
 
 class RelationshipType(str, Enum):
-    """Typen für Beziehungen im Knowledge Graph."""
-    
-    # Basisbeziehungen
+    """Types for relationships in the Knowledge Graph."""
+
+    # Base relationships
     DEPENDS_ON = "DEPENDS_ON"
     CALLS = "CALLS"
     IMPORTS = "IMPORTS"
@@ -72,13 +72,13 @@ class RelationshipType(str, Enum):
     DEFINES = "DEFINES"
     USES = "USES"
     PROVIDES_SERVICE_TO = "PROVIDES_SERVICE_TO"
-    
-    # Spezifische Abhängigkeiten
+
+    # Specific dependencies
     STARTUP_DEPENDENCY = "STARTUP_DEPENDENCY"
     RUNTIME_DEPENDENCY = "RUNTIME_DEPENDENCY"
     CONFIGURATION_DEPENDENCY = "CONFIGURATION_DEPENDENCY"
-    
-    # Schnittstellenbeziehungen
+
+    # Interface relationships
     EXPOSES = "EXPOSES"
     IMPLEMENTS = "IMPLEMENTS"
     HAS_FUNCTION = "HAS_FUNCTION"
@@ -86,12 +86,12 @@ class RelationshipType(str, Enum):
     HAS_STEP = "HAS_STEP"
     HAS_ENDPOINT = "HAS_ENDPOINT"
     HAS_COMMAND = "HAS_COMMAND"
-    
-    # Datenflussbeziehungen
+
+    # Data flow relationships
     SOURCE = "SOURCE"
     TARGET = "TARGET"
-    
-    # Migrationsbeziehungen
+
+    # Migration relationships
     MIGRATED_TO = "MIGRATED_TO"
     TRANSFORMED_FROM = "TRANSFORMED_FROM"
     EQUIVALENT_TO = "EQUIVALENT_TO"
@@ -99,202 +99,149 @@ class RelationshipType(str, Enum):
 
 
 class SchemaManager:
-    """Manager für das Schema des Knowledge Graphs."""
-    
+    """Manager for the Knowledge Graph schema."""
+
     def __init__(self, client: Optional[Neo4jClient] = None):
         """
-        Initialisiert einen neuen SchemaManager.
-        
+        Initializes a new SchemaManager.
+
         Args:
-            client: Neo4j-Client-Instanz
+            client: Neo4j client instance
         """
         self.client = client or get_client()
-    
+
     def create_schema(self) -> bool:
         """
-        Erstellt das Schema für den Knowledge Graph.
-        
+        Creates the schema for the Knowledge Graph.
+
         Returns:
-            bool: True, wenn das Schema erfolgreich erstellt wurde, sonst False
+            bool: True if the schema was successfully created, False otherwise
         """
         try:
-            # Verbindung zur Datenbank herstellen
+            # Establish connection to the database
             if not self.client.ensure_connected():
-                logging.error("Keine Verbindung zur Neo4j-Datenbank")
+                logging.error("No connection to Neo4j database")
                 return False
-            
-            # Einschränkungen erstellen
+
+            # Create constraints
             self._create_constraints()
-            
-            # Indizes erstellen
+
+            # Create indices
             self._create_indices()
-            
-            logging.success("Schema erfolgreich erstellt")
+
+            logging.success("Schema successfully created")
             return True
         except Exception as e:
-            logging.error(f"Fehler beim Erstellen des Schemas: {str(e)}")
+            logging.error(f"Error creating schema: {str(e)}")
             return False
-    
+
     def _create_constraints(self) -> None:
-        """Erstellt Einschränkungen für den Knowledge Graph."""
-        # Einschränkungen für Entitäten
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:Entity)
-        ASSERT n.id IS UNIQUE
-        """)
+        """Creates constraints for the Knowledge Graph."""
+        # Define constraints with their parameters
+        constraints = [
+            {"label": "Entity", "property": "id", "type": "UNIQUE"},
+            {"label": "Component", "property": "name", "type": "UNIQUE"},
+            {"label": "Function", "property": "name,filePath", "type": "UNIQUE"},
+            {"label": "Variable", "property": "name,filePath", "type": "UNIQUE"},
+            {"label": "ConfigParam", "property": "name", "type": "UNIQUE"},
+            {"label": "Service", "property": "name", "type": "UNIQUE"},
+            {"label": "API", "property": "name", "type": "UNIQUE"},
+            {"label": "CLI", "property": "name", "type": "UNIQUE"},
+            {"label": "MigrationDecision", "property": "id", "type": "UNIQUE"}
+        ]
         
-        # Einschränkungen für Komponenten
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:Component)
-        ASSERT n.name IS UNIQUE
-        """)
-        
-        # Einschränkungen für Funktionen
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:Function)
-        ASSERT (n.name, n.filePath) IS UNIQUE
-        """)
-        
-        # Einschränkungen für Variablen
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:Variable)
-        ASSERT (n.name, n.filePath) IS UNIQUE
-        """)
-        
-        # Einschränkungen für Konfigurationsparameter
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:ConfigParam)
-        ASSERT n.name IS UNIQUE
-        """)
-        
-        # Einschränkungen für Dienste
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:Service)
-        ASSERT n.name IS UNIQUE
-        """)
-        
-        # Einschränkungen für APIs
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:API)
-        ASSERT n.name IS UNIQUE
-        """)
-        
-        # Einschränkungen für CLIs
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:CLI)
-        ASSERT n.name IS UNIQUE
-        """)
-        
-        # Einschränkungen für Migrationsentscheidungen
-        self.client.run_query("""
-        CREATE CONSTRAINT ON (n:MigrationDecision)
-        ASSERT n.id IS UNIQUE
-        """)
-        
-        logging.info("Einschränkungen erfolgreich erstellt")
-    
+        # Create each constraint
+        for constraint in constraints:
+            # Neo4j doesn't support parameterization for schema operations
+            # so we need to construct the query safely
+            if "," in constraint["property"]:
+                # Composite property constraint
+                query = f"""
+                CREATE CONSTRAINT ON (n:{constraint["label"]})
+                ASSERT ({constraint["property"]}) IS {constraint["type"]}
+                """
+            else:
+                # Single property constraint
+                query = f"""
+                CREATE CONSTRAINT ON (n:{constraint["label"]})
+                ASSERT n.{constraint["property"]} IS {constraint["type"]}
+                """
+                
+            self.client.run_query(query)
+
+        logging.info("Constraints successfully created")
+
     def _create_indices(self) -> None:
-        """Erstellt Indizes für den Knowledge Graph."""
-        # Index für Entitäten
-        self.client.run_query("""
-        CREATE INDEX ON :Entity(type)
-        """)
+        """Creates indices for the Knowledge Graph."""
+        # Define indices with their parameters
+        indices = [
+            {"label": "Entity", "property": "type"},
+            {"label": "Component", "property": "type"},
+            {"label": "Function", "property": "name"},
+            {"label": "Function", "property": "filePath"},
+            {"label": "Variable", "property": "name"},
+            {"label": "ConfigParam", "property": "name"},
+            {"label": "Service", "property": "name"},
+            {"label": "BashOriginal", "property": "filePath"},
+            {"label": "PythonEquivalent", "property": "filePath"}
+        ]
         
-        # Index für Komponenten
-        self.client.run_query("""
-        CREATE INDEX ON :Component(type)
-        """)
-        
-        # Index für Funktionen
-        self.client.run_query("""
-        CREATE INDEX ON :Function(name)
-        """)
-        
-        # Index für Funktionen nach Dateipfad
-        self.client.run_query("""
-        CREATE INDEX ON :Function(filePath)
-        """)
-        
-        # Index für Variablen
-        self.client.run_query("""
-        CREATE INDEX ON :Variable(name)
-        """)
-        
-        # Index für Konfigurationsparameter
-        self.client.run_query("""
-        CREATE INDEX ON :ConfigParam(name)
-        """)
-        
-        # Index für Dienste
-        self.client.run_query("""
-        CREATE INDEX ON :Service(name)
-        """)
-        
-        # Index für Bash-Originale
-        self.client.run_query("""
-        CREATE INDEX ON :BashOriginal(filePath)
-        """)
-        
-        # Index für Python-Äquivalente
-        self.client.run_query("""
-        CREATE INDEX ON :PythonEquivalent(filePath)
-        """)
-        
-        logging.info("Indizes erfolgreich erstellt")
-    
+        # Create each index
+        for index in indices:
+            # Neo4j doesn't support parameterization for schema operations
+            # so we need to construct the query safely
+            query = f"""
+            CREATE INDEX ON :{index["label"]}({index["property"]})
+            """
+            
+            self.client.run_query(query)
+
+        logging.info("Indices successfully created")
+
     def drop_schema(self) -> bool:
         """
-        Löscht das Schema für den Knowledge Graph.
-        
+        Drops the schema for the Knowledge Graph.
+
         Returns:
-            bool: True, wenn das Schema erfolgreich gelöscht wurde, sonst False
+            bool: True if the schema was successfully dropped, False otherwise
         """
         try:
-            # Verbindung zur Datenbank herstellen
+            # Establish connection to the database
             if not self.client.ensure_connected():
-                logging.error("Keine Verbindung zur Neo4j-Datenbank")
+                logging.error("No connection to Neo4j database")
                 return False
-            
-            # Einschränkungen löschen
-            self.client.run_query("""
-            CALL apoc.schema.assert({}, {})
-            """)
-            
-            logging.success("Schema erfolgreich gelöscht")
+
+            # Delete constraints - using APOC procedure which doesn't need parameterization
+            self.client.run_query("CALL apoc.schema.assert({}, {})")
+
+            logging.success("Schema successfully dropped")
             return True
         except Exception as e:
-            logging.error(f"Fehler beim Löschen des Schemas: {str(e)}")
+            logging.error(f"Error dropping schema: {str(e)}")
             return False
-    
+
     def get_schema_info(self) -> Dict:
         """
-        Ruft Informationen über das Schema ab.
-        
+        Retrieves information about the schema.
+
         Returns:
-            Dict: Informationen über das Schema
+            Dict: Information about the schema
         """
         try:
-            # Verbindung zur Datenbank herstellen
+            # Establish connection to the database
             if not self.client.ensure_connected():
-                logging.error("Keine Verbindung zur Neo4j-Datenbank")
+                logging.error("No connection to Neo4j database")
                 return {}
-            
-            # Einschränkungen abrufen
-            constraints_result = self.client.run_query("""
-            CALL db.constraints()
-            """)
-            
-            # Indizes abrufen
-            indices_result = self.client.run_query("""
-            CALL db.indexes()
-            """)
-            
-            return {
-                "constraints": constraints_result,
-                "indices": indices_result
-            }
+
+            # Retrieve constraints - system procedure doesn't need parameterization
+            constraints_result = self.client.run_query("CALL db.constraints()")
+
+            # Retrieve indices - system procedure doesn't need parameterization
+            indices_result = self.client.run_query("CALL db.indexes()")
+
+            return {"constraints": constraints_result, "indices": indices_result}
         except Exception as e:
-            logging.error(f"Fehler beim Abrufen der Schema-Informationen: {str(e)}")
+            logging.error(f"Error retrieving schema information: {str(e)}")
             return {}
 
 
@@ -302,44 +249,44 @@ def create_entity_node(
     client: Optional[Neo4jClient] = None,
     entity_id: str = None,
     labels: List[str] = None,
-    properties: Dict = None
+    properties: Dict = None,
 ) -> Optional[Dict]:
     """
-    Erstellt einen Entitätsknoten im Knowledge Graph.
-    
+    Creates an entity node in the Knowledge Graph.
+
     Args:
-        client: Neo4j-Client-Instanz
-        entity_id: ID der Entität
-        labels: Labels für den Knoten
-        properties: Eigenschaften des Knotens
-        
+        client: Neo4j client instance
+        entity_id: ID of the entity
+        labels: Labels for the node
+        properties: Properties of the node
+
     Returns:
-        Optional[Dict]: Erstellter Knoten oder None, wenn ein Fehler aufgetreten ist
+        Optional[Dict]: Created node or None if an error occurred
     """
     if client is None:
         client = get_client()
-    
+
     if not client.ensure_connected():
-        logging.error("Keine Verbindung zur Neo4j-Datenbank")
+        logging.error("No connection to Neo4j database")
         return None
-    
+
     if labels is None:
         labels = [NodeLabel.ENTITY]
     elif NodeLabel.ENTITY not in labels:
         labels.append(NodeLabel.ENTITY)
-    
+
     if properties is None:
         properties = {}
-    
+
     if entity_id:
         properties["id"] = entity_id
-    
+
     try:
-        # Knoten erstellen
+        # Create node
         result = client.create_node(labels, properties)
         return result
     except Exception as e:
-        logging.error(f"Fehler beim Erstellen des Entitätsknotens: {str(e)}")
+        logging.error(f"Error creating entity node: {str(e)}")
         return None
 
 
@@ -348,286 +295,295 @@ def create_relationship(
     start_node_id: int = None,
     end_node_id: int = None,
     relationship_type: str = None,
-    properties: Dict = None
+    properties: Dict = None,
 ) -> Optional[Dict]:
     """
-    Erstellt eine Beziehung zwischen zwei Knoten im Knowledge Graph.
-    
+    Creates a relationship between two nodes in the Knowledge Graph.
+
     Args:
-        client: Neo4j-Client-Instanz
-        start_node_id: ID des Startknotens
-        end_node_id: ID des Endknotens
-        relationship_type: Typ der Beziehung
-        properties: Eigenschaften der Beziehung
-        
+        client: Neo4j client instance
+        start_node_id: ID of the start node
+        end_node_id: ID of the end node
+        relationship_type: Type of the relationship
+        properties: Properties of the relationship
+
     Returns:
-        Optional[Dict]: Erstellte Beziehung oder None, wenn ein Fehler aufgetreten ist
+        Optional[Dict]: Created relationship or None if an error occurred
     """
     if client is None:
         client = get_client()
-    
+
     if not client.ensure_connected():
-        logging.error("Keine Verbindung zur Neo4j-Datenbank")
+        logging.error("No connection to Neo4j database")
         return None
-    
+
     if start_node_id is None or end_node_id is None or relationship_type is None:
-        logging.error("Start-Knoten-ID, End-Knoten-ID und Beziehungstyp müssen angegeben werden")
+        logging.error(
+            "Start node ID, end node ID, and relationship type must be specified"
+        )
         return None
-    
+
     if properties is None:
         properties = {}
-    
+
     try:
-        # Beziehung erstellen
+        # Create relationship
         result = client.create_relationship(
-            start_node_id,
-            end_node_id,
-            relationship_type,
-            properties
+            start_node_id, end_node_id, relationship_type, properties
         )
         return result
     except Exception as e:
-        logging.error(f"Fehler beim Erstellen der Beziehung: {str(e)}")
+        logging.error(f"Error creating relationship: {str(e)}")
         return None
 
 
 def import_json_ld_schema(
-    schema_file_path: str,
-    client: Optional[Neo4jClient] = None
+    schema_file_path: str, client: Optional[Neo4jClient] = None
 ) -> bool:
     """
-    Importiert ein JSON-LD-Schema in den Knowledge Graph.
-    
+    Imports a JSON-LD schema into the Knowledge Graph.
+
     Args:
-        schema_file_path: Pfad zur JSON-LD-Schema-Datei
-        client: Neo4j-Client-Instanz
-        
+        schema_file_path: Path to the JSON-LD schema file
+        client: Neo4j client instance
+
     Returns:
-        bool: True, wenn das Schema erfolgreich importiert wurde, sonst False
+        bool: True if the schema was successfully imported, False otherwise
     """
     import json
     import os
-    
+
     if client is None:
         client = get_client()
-    
+
     if not client.ensure_connected():
-        logging.error("Keine Verbindung zur Neo4j-Datenbank")
+        logging.error("No connection to Neo4j database")
         return False
-    
+
     if not os.path.isfile(schema_file_path):
-        logging.error(f"Schema-Datei nicht gefunden: {schema_file_path}")
+        logging.error(f"Schema file not found: {schema_file_path}")
         return False
-    
+
     try:
-        # Schema-Datei laden
-        with open(schema_file_path, "r") as f:
+        # Load schema file
+        with open(schema_file_path) as f:
             schema = json.load(f)
-        
-        # Entitätstypen importieren
+
+        # Import entity types
         if "entityTypes" in schema:
             for entity_type in schema["entityTypes"]:
                 labels = [NodeLabel.ENTITY]
                 if "@type" in entity_type and entity_type["@type"] == "rdfs:Class":
                     labels.append(entity_type["name"])
-                
+
                 properties = {
                     "id": entity_type["@id"],
                     "name": entity_type["name"],
-                    "description": entity_type.get("description", "")
+                    "description": entity_type.get("description", ""),
                 }
-                
+
                 if "subClassOf" in entity_type:
                     properties["subClassOf"] = entity_type["subClassOf"]
-                
+
                 create_entity_node(client, entity_type["@id"], labels, properties)
-        
-        # Beziehungstypen importieren
+
+        # Import relationship types
         if "relationshipTypes" in schema:
             for relationship_type in schema["relationshipTypes"]:
                 labels = [NodeLabel.RELATIONSHIP]
-                if "@type" in relationship_type and relationship_type["@type"] == "rdfs:Class":
+                if (
+                    "@type" in relationship_type
+                    and relationship_type["@type"] == "rdfs:Class"
+                ):
                     labels.append(relationship_type["name"])
-                
+
                 properties = {
                     "id": relationship_type["@id"],
                     "name": relationship_type["name"],
-                    "description": relationship_type.get("description", "")
+                    "description": relationship_type.get("description", ""),
                 }
-                
+
                 if "subClassOf" in relationship_type:
                     properties["subClassOf"] = relationship_type["subClassOf"]
-                
+
                 create_entity_node(client, relationship_type["@id"], labels, properties)
-        
-        # Schnittstellentypen importieren
+
+        # Import interface types
         if "interfaceTypes" in schema:
             for interface_type in schema["interfaceTypes"]:
                 labels = [NodeLabel.INTERFACE]
-                if "@type" in interface_type and interface_type["@type"] == "rdfs:Class":
+                if (
+                    "@type" in interface_type
+                    and interface_type["@type"] == "rdfs:Class"
+                ):
                     labels.append(interface_type["name"])
-                
+
                 properties = {
                     "id": interface_type["@id"],
                     "name": interface_type["name"],
-                    "description": interface_type.get("description", "")
+                    "description": interface_type.get("description", ""),
                 }
-                
+
                 if "subClassOf" in interface_type:
                     properties["subClassOf"] = interface_type["subClassOf"]
-                
+
                 create_entity_node(client, interface_type["@id"], labels, properties)
-        
-        # Datenflusstypen importieren
+
+        # Import data flow types
         if "dataFlowTypes" in schema:
             for data_flow_type in schema["dataFlowTypes"]:
                 labels = [NodeLabel.DATA_FLOW]
-                if "@type" in data_flow_type and data_flow_type["@type"] == "rdfs:Class":
+                if (
+                    "@type" in data_flow_type
+                    and data_flow_type["@type"] == "rdfs:Class"
+                ):
                     labels.append(data_flow_type["name"])
-                
+
                 properties = {
                     "id": data_flow_type["@id"],
                     "name": data_flow_type["name"],
-                    "description": data_flow_type.get("description", "")
+                    "description": data_flow_type.get("description", ""),
                 }
-                
+
                 if "subClassOf" in data_flow_type:
                     properties["subClassOf"] = data_flow_type["subClassOf"]
-                
+
                 create_entity_node(client, data_flow_type["@id"], labels, properties)
-        
-        logging.success(f"Schema erfolgreich aus {schema_file_path} importiert")
+
+        logging.success(f"Schema successfully imported from {schema_file_path}")
         return True
     except Exception as e:
-        logging.error(f"Fehler beim Importieren des Schemas: {str(e)}")
+        logging.error(f"Error importing schema: {str(e)}")
         return False
 
 
 def import_json_ld_graph(
-    graph_file_path: str,
-    client: Optional[Neo4jClient] = None
+    graph_file_path: str, client: Optional[Neo4jClient] = None
 ) -> bool:
     """
-    Importiert einen JSON-LD-Graphen in den Knowledge Graph.
-    
+    Imports a JSON-LD graph into the Knowledge Graph.
+
     Args:
-        graph_file_path: Pfad zur JSON-LD-Graphen-Datei
-        client: Neo4j-Client-Instanz
-        
+        graph_file_path: Path to the JSON-LD graph file
+        client: Neo4j client instance
+
     Returns:
-        bool: True, wenn der Graph erfolgreich importiert wurde, sonst False
+        bool: True if the graph was successfully imported, False otherwise
     """
     import json
     import os
-    
+
     if client is None:
         client = get_client()
-    
+
     if not client.ensure_connected():
-        logging.error("Keine Verbindung zur Neo4j-Datenbank")
+        logging.error("No connection to Neo4j database")
         return False
-    
+
     if not os.path.isfile(graph_file_path):
-        logging.error(f"Graphen-Datei nicht gefunden: {graph_file_path}")
+        logging.error(f"Graph file not found: {graph_file_path}")
         return False
-    
+
     try:
-        # Graphen-Datei laden
-        with open(graph_file_path, "r") as f:
+        # Load graph file
+        with open(graph_file_path) as f:
             graph_data = json.load(f)
-        
-        # Knoten-ID-Zuordnung für Beziehungen
+
+        # Node ID mapping for relationships
         node_id_map = {}
-        
-        # Graphen importieren
+
+        # Import graph
         if "@graph" in graph_data:
-            # Zuerst alle Knoten erstellen
+            # First create all nodes
             for node in graph_data["@graph"]:
                 if "@id" in node:
-                    # Typ des Knotens bestimmen
+                    # Determine node type
                     node_type = node.get("@type", "Entity")
                     labels = [node_type]
-                    
-                    # Eigenschaften extrahieren
-                    properties = {k: v for k, v in node.items() if not k.startswith("@") and not isinstance(v, dict)}
-                    
-                    # Knoten erstellen
-                    created_node = create_entity_node(client, node["@id"], labels, properties)
-                    
+
+                    # Extract properties
+                    properties = {
+                        k: v
+                        for k, v in node.items()
+                        if not k.startswith("@") and not isinstance(v, dict)
+                    }
+
+                    # Create node
+                    created_node = create_entity_node(
+                        client, node["@id"], labels, properties
+                    )
+
                     if created_node:
-                        # ID-Zuordnung speichern
+                        # Save ID mapping
                         node_id_map[node["@id"]] = created_node["id"]
-            
-            # Dann alle Beziehungen erstellen
+
+            # Then create all relationships
             for node in graph_data["@graph"]:
                 if "@id" in node:
                     start_node_id = node_id_map.get(node["@id"])
-                    
+
                     if start_node_id:
-                        # Beziehungen extrahieren
+                        # Extract relationships
                         for key, value in node.items():
                             if isinstance(value, dict) and "@id" in value:
                                 end_node_id = node_id_map.get(value["@id"])
-                                
+
                                 if end_node_id:
-                                    # Beziehung erstellen
+                                    # Create relationship
                                     create_relationship(
-                                        client,
-                                        start_node_id,
-                                        end_node_id,
-                                        key.upper()
+                                        client, start_node_id, end_node_id, key.upper()
                                     )
-        
-        logging.success(f"Graph erfolgreich aus {graph_file_path} importiert")
+
+        logging.success(f"Graph successfully imported from {graph_file_path}")
         return True
     except Exception as e:
-        logging.error(f"Fehler beim Importieren des Graphen: {str(e)}")
+        logging.error(f"Error importing graph: {str(e)}")
         return False
 
 
 def init_knowledge_graph(
     schema_file_path: Optional[str] = None,
     graph_file_path: Optional[str] = None,
-    client: Optional[Neo4jClient] = None
+    client: Optional[Neo4jClient] = None,
 ) -> bool:
     """
-    Initialisiert den Knowledge Graph mit Schema und Daten.
-    
+    Initializes the Knowledge Graph with schema and data.
+
     Args:
-        schema_file_path: Pfad zur JSON-LD-Schema-Datei
-        graph_file_path: Pfad zur JSON-LD-Graphen-Datei
-        client: Neo4j-Client-Instanz
-        
+        schema_file_path: Path to the JSON-LD schema file
+        graph_file_path: Path to the JSON-LD graph file
+        client: Neo4j client instance
+
     Returns:
-        bool: True, wenn der Knowledge Graph erfolgreich initialisiert wurde, sonst False
+        bool: True if the Knowledge Graph was successfully initialized, False otherwise
     """
     if client is None:
         client = get_client()
-    
+
     if not client.ensure_connected():
-        logging.error("Keine Verbindung zur Neo4j-Datenbank")
+        logging.error("No connection to Neo4j database")
         return False
-    
-    # Schema erstellen
+
+    # Create schema
     schema_manager = SchemaManager(client)
     if not schema_manager.create_schema():
-        logging.error("Fehler beim Erstellen des Schemas")
+        logging.error("Error creating schema")
         return False
-    
-    # Schema importieren, wenn angegeben
+
+    # Import schema if specified
     if schema_file_path:
         if not import_json_ld_schema(schema_file_path, client):
-            logging.error(f"Fehler beim Importieren des Schemas aus {schema_file_path}")
+            logging.error(f"Error importing schema from {schema_file_path}")
             return False
-    
-    # Graphen importieren, wenn angegeben
+
+    # Import graph if specified
     if graph_file_path:
         if not import_json_ld_graph(graph_file_path, client):
-            logging.error(f"Fehler beim Importieren des Graphen aus {graph_file_path}")
+            logging.error(f"Error importing graph from {graph_file_path}")
             return False
-    
-    logging.success("Knowledge Graph erfolgreich initialisiert")
+
+    logging.success("Knowledge Graph successfully initialized")
     return True
 
 
-logging.debug("Knowledge-Graph-Schema-Modul initialisiert")
+logging.debug("Knowledge Graph schema module initialized")

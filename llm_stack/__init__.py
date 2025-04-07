@@ -1,7 +1,7 @@
 """
-LLM Stack - Eine moderne, wartbare und performante Python-Implementierung des LOCAL-LLM-STACK.
+LLM Stack - A modern, maintainable, and performant Python implementation of the LOCAL-LLM-STACK.
 
-Dieses Paket bietet Tools und Funktionen zur Verwaltung und Bereitstellung lokaler LLM-Dienste.
+This package provides tools and functions for managing and deploying local LLM services.
 """
 
 __version__ = "0.1.0"

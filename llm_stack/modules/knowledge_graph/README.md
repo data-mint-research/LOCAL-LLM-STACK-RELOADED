@@ -1,110 +1,110 @@
-# Knowledge Graph Modul
+# Knowledge Graph Module
 
-Dieses Modul stellt eine Integration mit neo4j für den LOCAL-LLM-STACK bereit, die als zentrale Wissensbasis für autonome AI Coding Agents dient.
+This module provides integration with neo4j for the LOCAL-LLM-STACK-RELOADED, serving as a central knowledge base for autonomous AI Coding Agents.
 
-## Übersicht
+## Overview
 
-Das Knowledge Graph Modul ermöglicht die Erfassung, Speicherung und Abfrage von Informationen über den Migrationsprozess von Bash zu Python. Es verfolgt Migrationsentscheidungen, Code-Transformationen und die Beziehungen zwischen Original-Bash-Dateien und ihren Python-Äquivalenten.
+The Knowledge Graph Module enables capturing, storing, and querying information about the migration process from Bash to Python. It tracks migration decisions, code transformations, and the relationships between original Bash files and their Python equivalents.
 
-## Funktionen
+## Features
 
-- **Migrationsentscheidungen aufzeichnen**: Dokumentiert Entscheidungen, die während des Migrationsprozesses getroffen werden, einschließlich Begründungen und Alternativen.
-- **Code-Transformationen verfolgen**: Zeichnet Änderungen am Code auf, einschließlich des Codes vor und nach der Transformation.
-- **Bash- und Python-Dateien verknüpfen**: Stellt Beziehungen zwischen Original-Bash-Dateien und ihren Python-Äquivalenten her.
-- **Migrationsstatistiken**: Bietet Einblick in den Fortschritt des Migrationsprozesses.
-- **Abfragen und Visualisierung**: Ermöglicht die Abfrage und Visualisierung des Knowledge Graphs über die neo4j-Benutzeroberfläche.
+- **Record Migration Decisions**: Documents decisions made during the migration process, including rationales and alternatives.
+- **Track Code Transformations**: Records changes to code, including before and after transformation states.
+- **Link Bash and Python Files**: Establishes relationships between original Bash files and their Python equivalents.
+- **Migration Statistics**: Provides insight into the progress of the migration process.
+- **Query and Visualization**: Enables querying and visualization of the Knowledge Graph through the neo4j user interface.
 
-## Architektur
+## Architecture
 
-Das Modul besteht aus folgenden Komponenten:
+The module consists of the following components:
 
-1. **neo4j-Datenbank**: Speichert den Knowledge Graph.
-2. **Client-Bibliothek**: Stellt eine Verbindung zur neo4j-Datenbank her und bietet grundlegende Operationen.
-3. **Schema-Manager**: Definiert und verwaltet das Schema des Knowledge Graphs.
-4. **Migrations-Tracker**: Zeichnet Migrationsentscheidungen und Code-Transformationen auf.
-5. **CLI-Befehle**: Ermöglicht die Interaktion mit dem Knowledge Graph über die Befehlszeile.
+1. **neo4j Database**: Stores the Knowledge Graph.
+2. **Client Library**: Provides connection to the neo4j database and basic operations.
+3. **Schema Manager**: Defines and manages the schema of the Knowledge Graph.
+4. **Migration Tracker**: Records migration decisions and code transformations.
+5. **CLI Commands**: Enables interaction with the Knowledge Graph via the command line.
 
-## Verwendung
+## Usage
 
-### Modul starten
+### Starting the Module
 
 ```bash
 llm start --with knowledge_graph
 ```
 
-### Status prüfen
+### Checking Status
 
 ```bash
 llm kg status
 ```
 
-### Migrationsstatistiken anzeigen
+### Displaying Migration Statistics
 
 ```bash
 llm kg stats
 ```
 
-### Migrationsentscheidung aufzeichnen
+### Recording a Migration Decision
 
 ```bash
-llm kg record-decision --decision "Funktion X nach Python migrieren" --rationale "Bessere Lesbarkeit und Wartbarkeit" --bash-file "path/to/bash/file.sh" --python-file "path/to/python/file.py"
+llm kg record-decision --decision "Migrate function X to Python" --rationale "Better readability and maintainability" --bash-file "path/to/bash/file.sh" --python-file "path/to/python/file.py"
 ```
 
-### Code-Transformation aufzeichnen
+### Recording a Code Transformation
 
 ```bash
 llm kg record-transformation --type "function_migration" --before "bash_code_here" --after "python_code_here" --bash-file "path/to/bash/file.sh" --python-file "path/to/python/file.py"
 ```
 
-### Bash-Datei aufzeichnen
+### Recording a Bash File
 
 ```bash
 llm kg record-bash-file --file-path "path/to/bash/file.sh" --content-file "path/to/content/file.sh"
 ```
 
-### Python-Datei aufzeichnen
+### Recording a Python File
 
 ```bash
 llm kg record-python-file --file-path "path/to/python/file.py" --content-file "path/to/content/file.py" --bash-file "path/to/bash/file.sh"
 ```
 
-### Migrationsentscheidungen abrufen
+### Retrieving Migration Decisions
 
 ```bash
 llm kg get-decisions --bash-file "path/to/bash/file.sh"
 ```
 
-### Code-Transformationen abrufen
+### Retrieving Code Transformations
 
 ```bash
 llm kg get-transformations --bash-file "path/to/bash/file.sh"
 ```
 
-### Dateistatus abrufen
+### Retrieving File Status
 
 ```bash
 llm kg get-file-status --bash-file "path/to/bash/file.sh"
 ```
 
-## Programmierung mit dem Knowledge Graph
+## Programming with the Knowledge Graph
 
-Das Modul kann auch programmatisch verwendet werden:
+The module can also be used programmatically:
 
 ```python
 from llm_stack.modules.knowledge_graph.module import get_module
 
-# Modul-Instanz abrufen
+# Get module instance
 kg_module = get_module()
 
-# Migrationsentscheidung aufzeichnen
+# Record migration decision
 kg_module.record_migration_decision(
-    decision="Funktion X nach Python migrieren",
-    rationale="Bessere Lesbarkeit und Wartbarkeit",
+    decision="Migrate function X to Python",
+    rationale="Better readability and maintainability",
     bash_file_path="path/to/bash/file.sh",
     python_file_path="path/to/python/file.py"
 )
 
-# Code-Transformation aufzeichnen
+# Record code transformation
 kg_module.record_code_transformation(
     transformation_type="function_migration",
     before="bash_code_here",
@@ -113,30 +113,30 @@ kg_module.record_code_transformation(
     python_file_path="path/to/python/file.py"
 )
 
-# Migrationsstatistiken abrufen
+# Get migration statistics
 stats = kg_module.get_migration_statistics()
 print(f"Migration progress: {stats['migration_progress']:.2f}%")
 ```
 
-## Neo4j-Benutzeroberfläche
+## Neo4j User Interface
 
-Die neo4j-Benutzeroberfläche ist unter http://localhost:7474 verfügbar. Die Standardanmeldedaten sind:
+The neo4j user interface is available at http://localhost:7474. The default credentials are:
 
-- Benutzername: neo4j
-- Passwort: password
+- Username: neo4j
+- Password: password
 
-In der Benutzeroberfläche können Sie Cypher-Abfragen ausführen, um den Knowledge Graph zu erkunden und zu visualisieren.
+In the user interface, you can execute Cypher queries to explore and visualize the Knowledge Graph.
 
-### Beispielabfragen
+### Example Queries
 
-Alle Migrationsentscheidungen anzeigen:
+Display all migration decisions:
 
 ```cypher
 MATCH (d:MigrationDecision)
 RETURN d
 ```
 
-Alle Code-Transformationen für eine bestimmte Bash-Datei anzeigen:
+Display all code transformations for a specific Bash file:
 
 ```cypher
 MATCH (t:CodeTransformation)-[:TRANSFORMED_FROM]->(b:BashOriginal)
@@ -144,26 +144,26 @@ WHERE b.file_path = "path/to/bash/file.sh"
 RETURN t, b
 ```
 
-Beziehungen zwischen Bash- und Python-Dateien anzeigen:
+Display relationships between Bash and Python files:
 
 ```cypher
 MATCH (p:PythonEquivalent)-[:EQUIVALENT_TO]->(b:BashOriginal)
 RETURN p, b
 ```
 
-## Konfiguration
+## Configuration
 
-Die Konfiguration des Knowledge Graph Moduls erfolgt über Umgebungsvariablen:
+The configuration of the Knowledge Graph module is done via environment variables:
 
-- `NEO4J_URI`: URI der neo4j-Datenbank (Standard: "bolt://localhost:7687")
-- `NEO4J_USERNAME`: Benutzername für die neo4j-Datenbank (Standard: "neo4j")
-- `NEO4J_PASSWORD`: Passwort für die neo4j-Datenbank (Standard: "password")
-- `NEO4J_DATABASE`: Name der zu verwendenden Datenbank (Standard: "neo4j")
-- `HOST_PORT_NEO4J_HTTP`: HTTP-Port für die neo4j-Benutzeroberfläche (Standard: 7474)
-- `HOST_PORT_NEO4J_BOLT`: Bolt-Port für die neo4j-Datenbank (Standard: 7687)
-- `HOST_PORT_NEO4J_HTTPS`: HTTPS-Port für die neo4j-Benutzeroberfläche (Standard: 7473)
-- `NEO4J_CPU_LIMIT`: CPU-Limit für den neo4j-Container (Standard: 0.5)
-- `NEO4J_MEMORY_LIMIT`: Speicherlimit für den neo4j-Container (Standard: 4G)
-- `NEO4J_HEAP_INITIAL`: Anfängliche Heap-Größe für neo4j (Standard: 512M)
-- `NEO4J_HEAP_MAX`: Maximale Heap-Größe für neo4j (Standard: 2G)
-- `NEO4J_PAGECACHE`: Größe des Pagecache für neo4j (Standard: 512M)
+- `NEO4J_URI`: URI of the neo4j database (default: "bolt://localhost:7687")
+- `NEO4J_USERNAME`: Username for the neo4j database (default: "neo4j")
+- `NEO4J_PASSWORD`: Password for the neo4j database (default: "password")
+- `NEO4J_DATABASE`: Name of the database to use (default: "neo4j")
+- `HOST_PORT_NEO4J_HTTP`: HTTP port for the neo4j user interface (default: 7474)
+- `HOST_PORT_NEO4J_BOLT`: Bolt port for the neo4j database (default: 7687)
+- `HOST_PORT_NEO4J_HTTPS`: HTTPS port for the neo4j user interface (default: 7473)
+- `NEO4J_CPU_LIMIT`: CPU limit for the neo4j container (default: 0.5)
+- `NEO4J_MEMORY_LIMIT`: Memory limit for the neo4j container (default: 4G)
+- `NEO4J_HEAP_INITIAL`: Initial heap size for neo4j (default: 512M)
+- `NEO4J_HEAP_MAX`: Maximum heap size for neo4j (default: 2G)
+- `NEO4J_PAGECACHE`: Pagecache size for neo4j (default: 512M)

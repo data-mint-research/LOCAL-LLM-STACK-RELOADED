@@ -1,6 +1,6 @@
 """
-Tools für den LLM Stack.
+Tools for the LLM Stack.
 
-Dieses Paket enthält verschiedene Hilfswerkzeuge für den LLM Stack,
-wie Entitätsextraktion, Beziehungszuordnung und Dokumentationswerkzeuge.
+This package contains various utility tools for the LLM Stack,
+such as entity extraction, relationship mapping, and documentation tools.
 """

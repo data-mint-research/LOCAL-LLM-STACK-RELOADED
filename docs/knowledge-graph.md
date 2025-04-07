@@ -1,59 +1,61 @@
 # Knowledge Graph Integration
 
-Die Knowledge Graph Integration ist ein zentraler Bestandteil des LOCAL-LLM-STACK-RELOADED, der als Wissensbasis für autonome AI Coding Agents dient. Diese Dokumentation beschreibt die Architektur, Funktionalität und Verwendung des Knowledge Graphs.
+The Knowledge Graph Integration is a central component of LOCAL-LLM-STACK-RELOADED, serving as a knowledge base for autonomous AI Coding Agents. This documentation describes the architecture, functionality, and usage of the Knowledge Graph.
 
-## Übersicht
+## Overview
 
-Der Knowledge Graph verwendet neo4j, eine Graphdatenbank, um Informationen über den Migrationsprozess von Bash zu Python zu speichern und abzufragen. Er ermöglicht die Verfolgung von Migrationsentscheidungen, Code-Transformationen und die Beziehungen zwischen Original-Bash-Dateien und ihren Python-Äquivalenten.
+The Knowledge Graph uses neo4j, a graph database, to store and query information about the migration process from Bash to Python. It enables tracking of migration decisions, code transformations, and the relationships between original Bash files and their Python equivalents.
 
-## Architektur
+## Architecture
 
-Die Knowledge Graph Integration besteht aus mehreren Komponenten:
+The Knowledge Graph Integration consists of several components:
 
-1. **neo4j-Datenbank**: Eine Graphdatenbank, die den Knowledge Graph speichert.
-2. **Knowledge Graph Modul**: Ein Python-Modul, das die Integration mit der neo4j-Datenbank bereitstellt.
-3. **CLI-Befehle**: Befehlszeilenschnittstelle für die Interaktion mit dem Knowledge Graph.
-4. **API**: Programmierschnittstelle für die Integration in andere Komponenten.
+1. **neo4j Database**: A graph database that stores the Knowledge Graph.
+2. **Client Library**: Provides connection to the neo4j database and basic operations.
+3. **Schema Manager**: Defines and manages the Knowledge Graph schema.
+4. **Migration Tracker**: Records migration decisions and code transformations.
+5. **CLI Commands**: Command-line interface for interacting with the Knowledge Graph.
+6. **API**: Programming interface for integration with other components.
 
-### Datenmodell
+### Data Model
 
-Das Datenmodell des Knowledge Graphs basiert auf dem JSON-LD-Schema des ursprünglichen LOCAL-LLM-STACK und wurde um spezifische Entitäten und Beziehungen für den Migrationsprozess erweitert:
+The Knowledge Graph's data model is based on the JSON-LD schema of the original LOCAL-LLM-STACK and has been extended with specific entities and relationships for the migration process:
 
-- **Entitäten**:
-  - `BashOriginal`: Repräsentiert eine Original-Bash-Datei.
-  - `PythonEquivalent`: Repräsentiert eine Python-Datei, die aus einer Bash-Datei migriert wurde.
-  - `MigrationDecision`: Repräsentiert eine Entscheidung, die während des Migrationsprozesses getroffen wurde.
-  - `CodeTransformation`: Repräsentiert eine Transformation von Bash-Code zu Python-Code.
+- **Entities**:
+  - `BashOriginal`: Represents an original Bash file.
+  - `PythonEquivalent`: Represents a Python file that was migrated from a Bash file.
+  - `MigrationDecision`: Represents a decision made during the migration process.
+  - `CodeTransformation`: Represents a transformation from Bash code to Python code.
 
-- **Beziehungen**:
-  - `EQUIVALENT_TO`: Verbindet eine Python-Datei mit ihrer entsprechenden Bash-Datei.
-  - `DECISION_FOR`: Verbindet eine Migrationsentscheidung mit einer Datei.
-  - `TRANSFORMED_FROM`: Verbindet eine Code-Transformation mit einer Bash-Datei.
-  - `MIGRATED_TO`: Verbindet eine Code-Transformation mit einer Python-Datei.
+- **Relationships**:
+  - `EQUIVALENT_TO`: Connects a Python file to its corresponding Bash file.
+  - `DECISION_FOR`: Connects a migration decision to a file.
+  - `TRANSFORMED_FROM`: Connects a code transformation to a Bash file.
+  - `MIGRATED_TO`: Connects a code transformation to a Python file.
 
-## Funktionalität
+## Functionality
 
-Der Knowledge Graph bietet folgende Funktionen:
+The Knowledge Graph provides the following functions:
 
-### Migrationsentscheidungen aufzeichnen
+### Recording Migration Decisions
 
-Während des Migrationsprozesses können Entscheidungen aufgezeichnet werden, einschließlich der Begründung, Alternativen und Auswirkungen. Diese Entscheidungen werden im Knowledge Graph gespeichert und können später abgefragt werden.
+During the migration process, decisions can be recorded, including rationale, alternatives, and impacts. These decisions are stored in the Knowledge Graph and can be queried later.
 
 ```python
 from llm_stack.modules.knowledge_graph.module import get_module
 
 kg_module = get_module()
 kg_module.record_migration_decision(
-    decision="Funktion X nach Python migrieren",
-    rationale="Bessere Lesbarkeit und Wartbarkeit",
+    decision="Migrate function X to Python",
+    rationale="Better readability and maintainability",
     bash_file_path="path/to/bash/file.sh",
     python_file_path="path/to/python/file.py"
 )
 ```
 
-### Code-Transformationen verfolgen
+### Tracking Code Transformations
 
-Code-Transformationen können aufgezeichnet werden, einschließlich des Codes vor und nach der Transformation. Diese Transformationen werden im Knowledge Graph gespeichert und können später abgefragt werden.
+Code transformations can be recorded, including the code before and after the transformation. These transformations are stored in the Knowledge Graph and can be queried later.
 
 ```python
 kg_module.record_code_transformation(
@@ -65,18 +67,18 @@ kg_module.record_code_transformation(
 )
 ```
 
-### Dateien verknüpfen
+### Linking Files
 
-Bash- und Python-Dateien können im Knowledge Graph aufgezeichnet und miteinander verknüpft werden. Dies ermöglicht die Nachverfolgung des Migrationsprozesses auf Dateiebene.
+Bash and Python files can be recorded in the Knowledge Graph and linked to each other. This enables tracking of the migration process at the file level.
 
 ```python
-# Bash-Datei aufzeichnen
+# Record Bash file
 kg_module.record_bash_file(
     file_path="path/to/bash/file.sh",
     content="bash_content_here"
 )
 
-# Python-Datei aufzeichnen und mit Bash-Datei verknüpfen
+# Record Python file and link with Bash file
 kg_module.record_python_file(
     file_path="path/to/python/file.py",
     content="python_content_here",
@@ -84,77 +86,77 @@ kg_module.record_python_file(
 )
 ```
 
-### Migrationsstatistiken
+### Migration Statistics
 
-Der Knowledge Graph bietet Statistiken über den Migrationsprozess, einschließlich der Anzahl der migrierten Dateien, der Anzahl der Migrationsentscheidungen und der Anzahl der Code-Transformationen.
+The Knowledge Graph provides statistics about the migration process, including the number of migrated files, the number of migration decisions, and the number of code transformations.
 
 ```python
 stats = kg_module.get_migration_statistics()
 print(f"Migration progress: {stats['migration_progress']:.2f}%")
 ```
 
-## Verwendung
+## Usage
 
-### Modul starten
+### Starting the Module
 
-Das Knowledge Graph Modul kann zusammen mit den Kernkomponenten gestartet werden:
+The Knowledge Graph module can be started together with the core components:
 
 ```bash
 llm start --with knowledge_graph
 ```
 
-### CLI-Befehle
+### CLI Commands
 
-Die Knowledge Graph Integration bietet verschiedene CLI-Befehle für die Interaktion mit dem Knowledge Graph:
+The Knowledge Graph Integration provides various CLI commands for interacting with the Knowledge Graph:
 
 ```bash
-# Status des Knowledge Graph Moduls anzeigen
+# Display status of the Knowledge Graph module
 llm kg status
 
-# Migrationsstatistiken anzeigen
+# Display migration statistics
 llm kg stats
 
-# Migrationsentscheidung aufzeichnen
-llm kg record-decision --decision "Funktion X nach Python migrieren" --rationale "Bessere Lesbarkeit und Wartbarkeit" --bash-file "path/to/bash/file.sh" --python-file "path/to/python/file.py"
+# Record migration decision
+llm kg record-decision --decision "Migrate function X to Python" --rationale "Better readability and maintainability" --bash-file "path/to/bash/file.sh" --python-file "path/to/python/file.py"
 
-# Code-Transformation aufzeichnen
+# Record code transformation
 llm kg record-transformation --type "function_migration" --before "bash_code_here" --after "python_code_here" --bash-file "path/to/bash/file.sh" --python-file "path/to/python/file.py"
 
-# Bash-Datei aufzeichnen
+# Record Bash file
 llm kg record-bash-file --file-path "path/to/bash/file.sh" --content-file "path/to/content/file.sh"
 
-# Python-Datei aufzeichnen
+# Record Python file
 llm kg record-python-file --file-path "path/to/python/file.py" --content-file "path/to/content/file.py" --bash-file "path/to/bash/file.sh"
 
-# Migrationsentscheidungen abrufen
+# Retrieve migration decisions
 llm kg get-decisions --bash-file "path/to/bash/file.sh"
 
-# Code-Transformationen abrufen
+# Retrieve code transformations
 llm kg get-transformations --bash-file "path/to/bash/file.sh"
 
-# Dateistatus abrufen
+# Retrieve file status
 llm kg get-file-status --bash-file "path/to/bash/file.sh"
 ```
 
-### Neo4j-Benutzeroberfläche
+### Neo4j User Interface
 
-Die neo4j-Benutzeroberfläche ist unter http://localhost:7474 verfügbar. Die Standardanmeldedaten sind:
+The neo4j user interface is available at http://localhost:7474. The default credentials are:
 
-- Benutzername: neo4j
-- Passwort: password
+- Username: neo4j
+- Password: password
 
-In der Benutzeroberfläche können Sie Cypher-Abfragen ausführen, um den Knowledge Graph zu erkunden und zu visualisieren.
+In the user interface, you can execute Cypher queries to explore and visualize the Knowledge Graph.
 
-#### Beispielabfragen
+#### Example Queries
 
-Alle Migrationsentscheidungen anzeigen:
+Display all migration decisions:
 
 ```cypher
 MATCH (d:MigrationDecision)
 RETURN d
 ```
 
-Alle Code-Transformationen für eine bestimmte Bash-Datei anzeigen:
+Display all code transformations for a specific Bash file:
 
 ```cypher
 MATCH (t:CodeTransformation)-[:TRANSFORMED_FROM]->(b:BashOriginal)
@@ -162,50 +164,67 @@ WHERE b.file_path = "path/to/bash/file.sh"
 RETURN t, b
 ```
 
-Beziehungen zwischen Bash- und Python-Dateien anzeigen:
+Display relationships between Bash and Python files:
 
 ```cypher
 MATCH (p:PythonEquivalent)-[:EQUIVALENT_TO]->(b:BashOriginal)
 RETURN p, b
 ```
 
-## Integration in den Migrationsprozess
+## Integration with Autonomous AI Coding Agents
 
-Der Knowledge Graph ist ein integraler Bestandteil des Migrationsprozesses. Er wird verwendet, um Informationen über den Migrationsprozess zu speichern und abzufragen, die von autonomen AI Coding Agents genutzt werden können.
+The Knowledge Graph is an integral part of the migration process. It is used to store and query information about the migration process that can be utilized by autonomous AI Coding Agents.
 
-### Autonome AI Coding Agents
+### Autonomous AI Coding Agents
 
-Autonome AI Coding Agents können den Knowledge Graph nutzen, um:
+Autonomous AI Coding Agents can use the Knowledge Graph to:
 
-1. **Informationen über den Migrationsprozess zu erhalten**: Agents können Informationen über bereits migrierte Dateien, getroffene Entscheidungen und durchgeführte Transformationen abrufen.
-2. **Migrationsentscheidungen zu treffen**: Agents können auf der Grundlage der im Knowledge Graph gespeicherten Informationen Entscheidungen treffen.
-3. **Migrationsentscheidungen aufzuzeichnen**: Agents können ihre Entscheidungen im Knowledge Graph aufzeichnen, um sie für andere Agents und für die Nachverfolgung verfügbar zu machen.
-4. **Code-Transformationen aufzuzeichnen**: Agents können die von ihnen durchgeführten Code-Transformationen im Knowledge Graph aufzeichnen.
+1. **Obtain information about the migration process**: Agents can retrieve information about already migrated files, decisions made, and transformations performed.
+2. **Make migration decisions**: Agents can make decisions based on the information stored in the Knowledge Graph.
+3. **Record migration decisions**: Agents can record their decisions in the Knowledge Graph to make them available to other agents and for tracking.
+4. **Record code transformations**: Agents can record the code transformations they perform in the Knowledge Graph.
 
-### Boomerang-Methode
+### Boomerang Method
 
-Die Boomerang-Methode für den iterativen Migrationsprozess nutzt den Knowledge Graph, um Informationen zwischen den Iterationen zu speichern und abzurufen:
+The Boomerang Method for the iterative migration process uses the Knowledge Graph to store and retrieve information between iterations:
 
-1. **Planung**: Agents analysieren den Knowledge Graph, um den aktuellen Stand des Migrationsprozesses zu verstehen und die nächsten Schritte zu planen.
-2. **Implementierung**: Agents führen die Migration durch und zeichnen ihre Entscheidungen und Transformationen im Knowledge Graph auf.
-3. **Kontrolle**: Agents überprüfen die Ergebnisse der Migration und zeichnen Feedback im Knowledge Graph auf.
-4. **Verbesserung**: Agents analysieren das Feedback im Knowledge Graph und verbessern den Migrationsprozess für die nächste Iteration.
+1. **Planning**: Agents analyze the Knowledge Graph to understand the current state of the migration process and plan the next steps.
+2. **Implementation**: Agents perform the migration and record their decisions and transformations in the Knowledge Graph.
+3. **Control**: Agents review the results of the migration and record feedback in the Knowledge Graph.
+4. **Improvement**: Agents analyze the feedback in the Knowledge Graph and improve the migration process for the next iteration.
 
-## Konfiguration
+## Configuration
 
-Die Konfiguration des Knowledge Graph Moduls erfolgt über Umgebungsvariablen:
+The configuration of the Knowledge Graph module is done via environment variables:
 
-- `NEO4J_URI`: URI der neo4j-Datenbank (Standard: "bolt://localhost:7687")
-- `NEO4J_USERNAME`: Benutzername für die neo4j-Datenbank (Standard: "neo4j")
-- `NEO4J_PASSWORD`: Passwort für die neo4j-Datenbank (Standard: "password")
-- `NEO4J_DATABASE`: Name der zu verwendenden Datenbank (Standard: "neo4j")
-- `HOST_PORT_NEO4J_HTTP`: HTTP-Port für die neo4j-Benutzeroberfläche (Standard: 7474)
-- `HOST_PORT_NEO4J_BOLT`: Bolt-Port für die neo4j-Datenbank (Standard: 7687)
-- `HOST_PORT_NEO4J_HTTPS`: HTTPS-Port für die neo4j-Benutzeroberfläche (Standard: 7473)
-- `NEO4J_CPU_LIMIT`: CPU-Limit für den neo4j-Container (Standard: 0.5)
-- `NEO4J_MEMORY_LIMIT`: Speicherlimit für den neo4j-Container (Standard: 4G)
-- `NEO4J_HEAP_INITIAL`: Anfängliche Heap-Größe für neo4j (Standard: 512M)
-- `NEO4J_HEAP_MAX`: Maximale Heap-Größe für neo4j (Standard: 2G)
-- `NEO4J_PAGECACHE`: Größe des Pagecache für neo4j (Standard: 512M)
+- `NEO4J_URI`: URI of the neo4j database (default: "bolt://localhost:7687")
+- `NEO4J_USERNAME`: Username for the neo4j database (default: "neo4j")
+- `NEO4J_PASSWORD`: Password for the neo4j database (default: "password")
+- `NEO4J_DATABASE`: Name of the database to use (default: "neo4j")
+- `HOST_PORT_NEO4J_HTTP`: HTTP port for the neo4j user interface (default: 7474)
+- `HOST_PORT_NEO4J_BOLT`: Bolt port for the neo4j database (default: 7687)
+- `HOST_PORT_NEO4J_HTTPS`: HTTPS port for the neo4j user interface (default: 7473)
+- `NEO4J_CPU_LIMIT`: CPU limit for the neo4j container (default: 0.5)
+- `NEO4J_MEMORY_LIMIT`: Memory limit for the neo4j container (default: 4G)
+- `NEO4J_HEAP_INITIAL`: Initial heap size for neo4j (default: 512M)
+- `NEO4J_HEAP_MAX`: Maximum heap size for neo4j (default: 2G)
+- `NEO4J_PAGECACHE`: Pagecache size for neo4j (default: 512M)
 
-Diese Variablen können in der Konfigurationsdatei `.env` gesetzt werden.
+These variables can be set in the `.env` configuration file.
+
+## Performance Considerations
+
+The Knowledge Graph is designed to be efficient and scalable. However, when working with large codebases, consider the following:
+
+1. **Batch Operations**: When recording multiple files or transformations, use batch operations where possible.
+2. **Query Optimization**: Use specific queries rather than retrieving all data and filtering client-side.
+3. **Index Usage**: The schema includes indexes on commonly queried properties for better performance.
+4. **Memory Configuration**: Adjust the neo4j memory settings based on the size of your Knowledge Graph.
+
+## Integration with Other Components
+
+The Knowledge Graph integrates with other components of the LOCAL-LLM-STACK-RELOADED:
+
+1. **Code Quality Module**: Records code quality metrics and improvements.
+2. **CLI**: Provides commands for interacting with the Knowledge Graph.
+3. **Core Utilities**: Uses core utilities for configuration and error handling.

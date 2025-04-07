@@ -1,5 +1,5 @@
 # docker/modules/neo4j.yml
-# Docker Compose-Konfiguration für den neo4j-Knowledge-Graph
+# Docker Compose configuration for the neo4j Knowledge Graph
 version: "3.8"
 
 networks:
@@ -16,7 +16,9 @@ services:
       - ../data/neo4j/import:/import
       - ../data/neo4j/plugins:/plugins
     environment:
-      - NEO4J_AUTH=${NEO4J_AUTH:-neo4j/password}
+      # Require explicit configuration of Neo4j credentials
+      # Format should be: username/password
+      - NEO4J_AUTH=${NEO4J_AUTH:?Neo4j authentication credentials must be explicitly set}
       - NEO4J_ACCEPT_LICENSE_AGREEMENT=${NEO4J_ACCEPT_LICENSE_AGREEMENT:-yes}
       - NEO4J_dbms_memory_heap_initial__size=${NEO4J_HEAP_INITIAL:-512M}
       - NEO4J_dbms_memory_heap_max__size=${NEO4J_HEAP_MAX:-2G}

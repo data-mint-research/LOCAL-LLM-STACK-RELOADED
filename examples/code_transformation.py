@@ -4,12 +4,14 @@ Beispiel für die Aufzeichnung einer Code-Transformation im Knowledge Graph.
 Dieses Skript zeigt, wie eine Code-Transformation von Bash zu Python
 im Knowledge Graph aufgezeichnet werden kann.
 """
-
 import os
 import sys
 
 # Pfad zum Projektverzeichnis hinzufügen
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from llm_stack.core.file_utils import ensure_file_exists
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from llm_stack.modules.knowledge_graph.module import get_module as get_kg_module
 
@@ -72,7 +74,9 @@ def start_command(component: Optional[str] = None, module: Optional[str] = None)
         logging.info("Tipp: Verwenden Sie 'llm status', um den Komponentenstatus zu prüfen")
         return True
     elif module is not None:
-        if not os.path.isdir(f"modules/{module}"):
+        # Verwende file_utils, um zu prüfen, ob das Modul existiert
+        module_path = f"modules/{module}"
+        if not os.path.isdir(module_path):
             logging.error(f"Modul nicht gefunden: {module}")
             return False
 
@@ -92,22 +96,33 @@ def start_command(component: Optional[str] = None, module: Optional[str] = None)
         return True
 '''
 
+
 def main():
     """Hauptfunktion."""
     try:
         # Knowledge Graph Modul abrufen
         kg_module = get_kg_module()
+
+        # Prüfe, ob die Dateipfade existieren
+        bash_file_path = "lib/common.sh"
+        python_file_path = "llm_stack/core/common.py"
         
+        # In diesem Beispiel müssen die Dateien nicht existieren, aber in einer realen Anwendung
+        # würde man prüfen, ob die Dateien existieren, bevor man die Transformation aufzeichnet
+        # if not ensure_file_exists(bash_file_path) or not ensure_file_exists(python_file_path):
+        #     print(f"Eine oder beide Dateien existieren nicht: {bash_file_path}, {python_file_path}")
+        #     return
+
         # Code-Transformation aufzeichnen
         result = kg_module.record_code_transformation(
             transformation_type="function_migration",
             before=BASH_CODE,
             after=PYTHON_CODE,
-            bash_file_path="lib/common.sh",
-            python_file_path="llm_stack/core/common.py",
-            decision_id=None  # Hier könnte die ID einer zuvor aufgezeichneten Entscheidung stehen
+            bash_file_path=bash_file_path,
+            python_file_path=python_file_path,
+            decision_id=None,  # Hier könnte die ID einer zuvor aufgezeichneten Entscheidung stehen
         )
-        
+
         if result:
             print("Code-Transformation erfolgreich aufgezeichnet")
         else:

@@ -1,8 +1,8 @@
 """
-Datenmodelle für den LLM Stack Knowledge Graph.
+Data models for the LLM Stack Knowledge Graph.
 
-Dieses Modul definiert Pydantic-Modelle für die Entitäten im Knowledge Graph,
-die für die Validierung und Serialisierung/Deserialisierung verwendet werden.
+This module defines Pydantic models for entities in the Knowledge Graph,
+which are used for validation and serialization/deserialization.
 """
 
 from datetime import datetime
@@ -15,8 +15,8 @@ from llm_stack.knowledge_graph.schema import NodeLabel, RelationshipType
 
 
 class EntityType(str, Enum):
-    """Typen für Entitäten im Knowledge Graph."""
-    
+    """Types for entities in the Knowledge Graph."""
+
     COMPONENT = "Component"
     CONTAINER = "Container"
     SCRIPT = "Script"
@@ -41,419 +41,475 @@ class EntityType(str, Enum):
 
 
 class Entity(BaseModel):
-    """Basismodell für alle Entitäten im Knowledge Graph."""
-    
+    """Base model for all entities in the Knowledge Graph."""
+
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
     type: EntityType
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
-    
+
+    def _convert_datetime_to_iso(self, properties: Dict) -> Dict:
+        """
+        Convert datetime objects to ISO format strings.
+        
+        Args:
+            properties: Dictionary containing properties
+            
+        Returns:
+            Dict: Dictionary with datetime objects converted to strings
+        """
+        # Create a copy to avoid modifying the original
+        result = properties.copy()
+        
+        # Convert datetime objects to ISO format strings
+        for key, value in result.items():
+            if isinstance(value, datetime):
+                result[key] = value.isoformat()
+                
+        return result
+
     def to_neo4j_properties(self) -> Dict:
         """
-        Konvertiert das Modell in ein Dictionary für Neo4j.
-        
+        Converts the model to a dictionary for Neo4j.
+
         Returns:
-            Dict: Neo4j-Eigenschaften
+            Dict: Neo4j properties
         """
+        # Exclude type as it's represented as a label
         properties = self.dict(exclude={"type"})
         
-        # Datetime-Objekte in Strings konvertieren
-        if "created_at" in properties and properties["created_at"]:
-            properties["created_at"] = properties["created_at"].isoformat()
-        
-        if "updated_at" in properties and properties["updated_at"]:
-            properties["updated_at"] = properties["updated_at"].isoformat()
-        
-        return properties
-    
+        # Convert datetime objects to strings
+        return self._convert_datetime_to_iso(properties)
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
         return [NodeLabel.ENTITY, self.type]
 
 
 class Component(Entity):
-    """Modell für Komponenten im Knowledge Graph."""
-    
+    """Model for components in the Knowledge Graph."""
+
     type: EntityType = EntityType.COMPONENT
     file_path: Optional[str] = None
     version: Optional[str] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.COMPONENT, self.type]
+        # Add the COMPONENT label to the base labels
+        base_labels = super().get_labels()
+        return base_labels[:1] + [NodeLabel.COMPONENT] + base_labels[1:]
 
 
 class Container(Component):
-    """Modell für Container im Knowledge Graph."""
-    
+    """Model for containers in the Knowledge Graph."""
+
     type: EntityType = EntityType.CONTAINER
     image: Optional[str] = None
     ports: Optional[List[str]] = None
     environment: Optional[Dict[str, str]] = None
     volumes: Optional[List[str]] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.COMPONENT, NodeLabel.CONTAINER]
+        # Replace the type label with CONTAINER
+        base_labels = super().get_labels()
+        return base_labels[:2] + [NodeLabel.CONTAINER]
 
 
 class Script(Component):
-    """Modell für Skripte im Knowledge Graph."""
-    
+    """Model for scripts in the Knowledge Graph."""
+
     type: EntityType = EntityType.SCRIPT
     language: Optional[str] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.COMPONENT, NodeLabel.SCRIPT]
+        # Replace the type label with SCRIPT
+        base_labels = super().get_labels()
+        return base_labels[:2] + [NodeLabel.SCRIPT]
 
 
 class Library(Component):
-    """Modell für Bibliotheken im Knowledge Graph."""
-    
+    """Model for libraries in the Knowledge Graph."""
+
     type: EntityType = EntityType.LIBRARY
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.COMPONENT, NodeLabel.LIBRARY]
+        # Replace the type label with LIBRARY
+        base_labels = super().get_labels()
+        return base_labels[:2] + [NodeLabel.LIBRARY]
 
 
 class Module(Component):
-    """Modell für Module im Knowledge Graph."""
-    
+    """Model for modules in the Knowledge Graph."""
+
     type: EntityType = EntityType.MODULE
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.COMPONENT, NodeLabel.MODULE]
+        # Replace the type label with MODULE
+        base_labels = super().get_labels()
+        return base_labels[:2] + [NodeLabel.MODULE]
 
 
 class Function(Entity):
-    """Modell für Funktionen im Knowledge Graph."""
-    
+    """Model for functions in the Knowledge Graph."""
+
     type: EntityType = EntityType.FUNCTION
     file_path: str
     line_number: Optional[int] = None
     signature: Optional[str] = None
     return_type: Optional[str] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.FUNCTION]
+        # Replace the type label with FUNCTION
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.FUNCTION]
 
 
 class Parameter(Entity):
-    """Modell für Parameter im Knowledge Graph."""
-    
+    """Model for parameters in the Knowledge Graph."""
+
     type: EntityType = EntityType.PARAMETER
     parameter_type: Optional[str] = None
     default_value: Optional[str] = None
     required: bool = False
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.PARAMETER]
+        # Replace the type label with PARAMETER
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.PARAMETER]
 
 
 class Variable(Entity):
-    """Modell für Variablen im Knowledge Graph."""
-    
+    """Model for variables in the Knowledge Graph."""
+
     type: EntityType = EntityType.VARIABLE
     file_path: str
     line_number: Optional[int] = None
     variable_type: Optional[str] = None
     value: Optional[str] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.VARIABLE]
+        # Replace the type label with VARIABLE
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.VARIABLE]
 
 
 class ConfigParam(Entity):
-    """Modell für Konfigurationsparameter im Knowledge Graph."""
-    
+    """Model for configuration parameters in the Knowledge Graph."""
+
     type: EntityType = EntityType.CONFIG_PARAM
     default_value: Optional[str] = None
     required: bool = False
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.CONFIG_PARAM]
+        # Replace the type label with CONFIG_PARAM
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.CONFIG_PARAM]
 
 
 class Service(Entity):
-    """Modell für Dienste im Knowledge Graph."""
-    
+    """Model for services in the Knowledge Graph."""
+
     type: EntityType = EntityType.SERVICE
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.SERVICE]
+        # Replace the type label with SERVICE
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.SERVICE]
 
 
 class Interface(Entity):
-    """Modell für Schnittstellen im Knowledge Graph."""
-    
+    """Model for interfaces in the Knowledge Graph."""
+
     type: EntityType = EntityType.INTERFACE
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.INTERFACE]
+        # Replace the type label with INTERFACE
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.INTERFACE]
 
 
 class API(Interface):
-    """Modell für APIs im Knowledge Graph."""
-    
+    """Model for APIs in the Knowledge Graph."""
+
     type: EntityType = EntityType.API
     base_url: Optional[str] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.INTERFACE, NodeLabel.API]
+        # Add API label to the interface labels
+        base_labels = super().get_labels()
+        return base_labels + [NodeLabel.API]
 
 
 class CLI(Interface):
-    """Modell für CLIs im Knowledge Graph."""
-    
+    """Model for CLIs in the Knowledge Graph."""
+
     type: EntityType = EntityType.CLI
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.INTERFACE, NodeLabel.CLI]
+        # Add CLI label to the interface labels
+        base_labels = super().get_labels()
+        return base_labels + [NodeLabel.CLI]
 
 
 class APIEndpoint(Entity):
-    """Modell für API-Endpunkte im Knowledge Graph."""
-    
+    """Model for API endpoints in the Knowledge Graph."""
+
     type: EntityType = EntityType.API_ENDPOINT
     path: str
     method: str
     parameters: Optional[List[Dict]] = None
     response: Optional[Dict] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.API_ENDPOINT]
+        # Replace the type label with API_ENDPOINT
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.API_ENDPOINT]
 
 
 class CLICommand(Entity):
-    """Modell für CLI-Befehle im Knowledge Graph."""
-    
+    """Model for CLI commands in the Knowledge Graph."""
+
     type: EntityType = EntityType.CLI_COMMAND
     command: str
     parameters: Optional[List[Dict]] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.CLI_COMMAND]
+        # Replace the type label with CLI_COMMAND
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.CLI_COMMAND]
 
 
 class DataFlow(Entity):
-    """Modell für Datenflüsse im Knowledge Graph."""
-    
+    """Model for data flows in the Knowledge Graph."""
+
     type: EntityType = EntityType.DATA_FLOW
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.DATA_FLOW]
+        # Replace the type label with DATA_FLOW
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.DATA_FLOW]
 
 
 class DataFlowStep(Entity):
-    """Modell für Datenflussschritte im Knowledge Graph."""
-    
+    """Model for data flow steps in the Knowledge Graph."""
+
     type: EntityType = EntityType.DATA_FLOW_STEP
     step_number: int
     data: Optional[Dict] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.DATA_FLOW_STEP]
+        # Replace the type label with DATA_FLOW_STEP
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.DATA_FLOW_STEP]
 
 
 class MigrationDecision(Entity):
-    """Modell für Migrationsentscheidungen im Knowledge Graph."""
-    
+    """Model for migration decisions in the Knowledge Graph."""
+
     type: EntityType = EntityType.MIGRATION_DECISION
     decision: str
     rationale: str
     alternatives: Optional[List[str]] = None
     impact: Optional[str] = None
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.MIGRATION_DECISION]
+        # Replace the type label with MIGRATION_DECISION
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.MIGRATION_DECISION]
 
 
 class CodeTransformation(Entity):
-    """Modell für Code-Transformationen im Knowledge Graph."""
-    
+    """Model for code transformations in the Knowledge Graph."""
+
     type: EntityType = EntityType.CODE_TRANSFORMATION
     transformation_type: str
     before: str
     after: str
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.CODE_TRANSFORMATION]
+        # Replace the type label with CODE_TRANSFORMATION
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.CODE_TRANSFORMATION]
 
 
 class BashOriginal(Entity):
-    """Modell für Bash-Originale im Knowledge Graph."""
-    
+    """Model for Bash originals in the Knowledge Graph."""
+
     type: EntityType = EntityType.BASH_ORIGINAL
     file_path: str
     content: str
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.BASH_ORIGINAL]
+        # Replace the type label with BASH_ORIGINAL
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.BASH_ORIGINAL]
 
 
 class PythonEquivalent(Entity):
-    """Modell für Python-Äquivalente im Knowledge Graph."""
-    
+    """Model for Python equivalents in the Knowledge Graph."""
+
     type: EntityType = EntityType.PYTHON_EQUIVALENT
     file_path: str
     content: str
-    
+
     def get_labels(self) -> List[str]:
         """
-        Gibt die Labels für den Neo4j-Knoten zurück.
-        
+        Returns the labels for the Neo4j node.
+
         Returns:
-            List[str]: Neo4j-Labels
+            List[str]: Neo4j labels
         """
-        return [NodeLabel.ENTITY, NodeLabel.PYTHON_EQUIVALENT]
+        # Replace the type label with PYTHON_EQUIVALENT
+        base_labels = super().get_labels()
+        return [base_labels[0], NodeLabel.PYTHON_EQUIVALENT]
 
 
 class Relationship(BaseModel):
-    """Basismodell für alle Beziehungen im Knowledge Graph."""
-    
+    """Base model for all relationships in the Knowledge Graph."""
+
     source_id: int
     target_id: int
     type: RelationshipType
     properties: Optional[Dict] = None
-    
+
     def to_neo4j_properties(self) -> Dict:
         """
-        Konvertiert das Modell in ein Dictionary für Neo4j.
-        
+        Converts the model to a dictionary for Neo4j.
+
         Returns:
-            Dict: Neo4j-Eigenschaften
+            Dict: Neo4j properties
         """
-        if self.properties:
-            return self.properties
-        return {}
+        # Return properties if they exist, otherwise an empty dict
+        return self.properties or {}
 
 
-# Modelltyp-Zuordnung
+# Model type mapping
 ENTITY_TYPE_TO_MODEL = {
     EntityType.COMPONENT: Component,
     EntityType.CONTAINER: Container,
@@ -475,72 +531,72 @@ ENTITY_TYPE_TO_MODEL = {
     EntityType.MIGRATION_DECISION: MigrationDecision,
     EntityType.CODE_TRANSFORMATION: CodeTransformation,
     EntityType.PYTHON_EQUIVALENT: PythonEquivalent,
-    EntityType.BASH_ORIGINAL: BashOriginal
+    EntityType.BASH_ORIGINAL: BashOriginal,
 }
 
 
 def create_entity_model(entity_type: EntityType, **kwargs) -> Entity:
     """
-    Erstellt ein Entitätsmodell basierend auf dem Typ.
-    
+    Creates an entity model based on the type.
+
     Args:
-        entity_type: Typ der Entität
-        **kwargs: Eigenschaften der Entität
-        
+        entity_type: Type of entity
+        **kwargs: Properties of the entity
+
     Returns:
-        Entity: Entitätsmodell
-    
+        Entity: Entity model
+
     Raises:
-        ValueError: Wenn der Entitätstyp nicht unterstützt wird
+        ValueError: If the entity type is not supported
     """
     if entity_type not in ENTITY_TYPE_TO_MODEL:
-        raise ValueError(f"Nicht unterstützter Entitätstyp: {entity_type}")
-    
+        raise ValueError(f"Unsupported entity type: {entity_type}")
+
     model_class = ENTITY_TYPE_TO_MODEL[entity_type]
     return model_class(**kwargs)
 
 
 def neo4j_to_entity_model(neo4j_node: Dict) -> Entity:
     """
-    Konvertiert einen Neo4j-Knoten in ein Entitätsmodell.
-    
+    Converts a Neo4j node to an entity model.
+
     Args:
-        neo4j_node: Neo4j-Knoten
-        
+        neo4j_node: Neo4j node
+
     Returns:
-        Entity: Entitätsmodell
-    
+        Entity: Entity model
+
     Raises:
-        ValueError: Wenn der Knotentyp nicht unterstützt wird
+        ValueError: If the node type is not supported
     """
-    # Labels extrahieren
+    # Extract labels
     labels = neo4j_node.get("labels", [])
-    
-    # Entitätstyp bestimmen
+
+    # Determine entity type
     entity_type = None
     for label in labels:
         if label in EntityType.__members__:
             entity_type = EntityType(label)
             break
-    
+
     if not entity_type:
         entity_type = EntityType.COMPONENT
-    
-    # Eigenschaften extrahieren
+
+    # Extract properties
     properties = neo4j_node.get("properties", {})
-    
-    # Datetime-Strings in Datetime-Objekte konvertieren
+
+    # Convert datetime strings to datetime objects
     if "created_at" in properties and isinstance(properties["created_at"], str):
         try:
             properties["created_at"] = datetime.fromisoformat(properties["created_at"])
         except ValueError:
             properties["created_at"] = datetime.now()
-    
+
     if "updated_at" in properties and isinstance(properties["updated_at"], str):
         try:
             properties["updated_at"] = datetime.fromisoformat(properties["updated_at"])
         except ValueError:
             properties["updated_at"] = datetime.now()
-    
-    # Modell erstellen
+
+    # Create model
     return create_entity_model(entity_type, **properties)

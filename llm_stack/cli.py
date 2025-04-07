@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-LLM Stack CLI - Befehlszeilenschnittstelle für den LLM Stack.
+LLM Stack CLI - Command-line interface for the LLM Stack.
 
-Diese Datei implementiert die Befehlszeilenschnittstelle für den LLM Stack,
-die als Ersatz für das ursprüngliche Bash-basierte CLI dient.
+This file implements the command-line interface for the LLM Stack,
+which serves as a replacement for the original Bash-based CLI.
 """
 
 import os
@@ -14,10 +14,16 @@ import click
 from rich.console import Console
 
 from llm_stack import __version__
+from llm_stack.cli_commands import generate_secrets as generate_secrets_cmd
+from llm_stack.cli_commands import (
+    update_librechat_secrets as update_librechat_secrets_cmd,
+)
+from llm_stack.cli_commands import validate_configs as validate_configs_cmd
+from llm_stack.code_quality import codeqa_cli
 from llm_stack.core import config, docker, logging
 from llm_stack.modules.knowledge_graph.module import kg_cli
 
-# Konsole für formatierte Ausgabe
+# Console for formatted output
 console = Console()
 
 
@@ -27,120 +33,157 @@ console = Console()
 def main(ctx: click.Context) -> None:
     """LOCAL-LLM-Stack CLI.
 
-    Diese Befehlszeilenschnittstelle ermöglicht die Verwaltung des LOCAL-LLM-Stacks,
-    einschließlich Starten, Stoppen, Statusprüfung und Konfiguration der Komponenten.
+    This command-line interface enables the management of the LOCAL-LLM-Stack,
+    including starting, stopping, status checking, and configuration of components.
     """
-    # Konfiguration laden
+    # Load configuration
     config.load_config()
 
-    # Wenn kein Unterbefehl angegeben ist, Hilfe anzeigen
+    # If no subcommand is specified, show help
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
 
 @main.command()
 @click.argument("component", required=False)
-@click.option("--with", "with_module", help="Modul, das zusammen mit den Kernkomponenten gestartet werden soll")
+@click.option(
+    "--with",
+    "with_module",
+    help="Module to start along with the core components",
+)
 def start(component: Optional[str], with_module: Optional[str]) -> None:
-    """Startet den Stack oder bestimmte Komponenten.
+    """Start the stack or specific components.
 
-    COMPONENT ist der Name der zu startenden Komponente (z.B. ollama, librechat).
-    Wenn keine Komponente angegeben ist, werden alle Komponenten gestartet.
+    Args:
+        component: Name of the component to start (e.g., ollama, librechat).
+            If not specified, all components will be started.
+        with_module: Module to start along with the core components.
     """
     if component is None and with_module is None:
-        logging.info("Starte alle Komponenten...")
-        # Prüfen, ob Secrets generiert sind
+        logging.info("Starting all components...")
+        # Check if secrets are generated
         config.check_secrets()
         docker.compose_up(config.CORE_PROJECT, config.CORE_COMPOSE, "")
-        logging.success("Kernkomponenten erfolgreich gestartet.")
-        logging.info("Tipp: Verwenden Sie 'llm status', um den Komponentenstatus zu prüfen")
+        logging.success("Core components successfully started.")
+        logging.info(
+            "Tip: Use 'llm status' to check component status"
+        )
     elif with_module is not None:
         if not os.path.isdir(f"modules/{with_module}"):
-            logging.error(f"Modul nicht gefunden: {with_module}")
+            logging.error(f"Module not found: {with_module}")
             sys.exit(1)
 
-        logging.info(f"Starte Kernkomponenten mit {with_module} Modul...")
+        logging.info(f"Starting core components with {with_module} module...")
         docker.compose_up(config.CORE_PROJECT, config.CORE_COMPOSE, "")
-        docker.compose_up(f"{config.CORE_PROJECT}-{with_module}", f"-f modules/{with_module}/docker-compose.yml", "")
-        logging.success(f"Kernkomponenten und {with_module} Modul erfolgreich gestartet.")
-        logging.info("Tipp: Verwenden Sie 'llm status', um den Komponentenstatus zu prüfen")
+        docker.compose_up(
+            f"{config.CORE_PROJECT}-{with_module}",
+            f"-f modules/{with_module}/docker-compose.yml",
+            "",
+        )
+        logging.success(
+            f"Core components and {with_module} module successfully started."
+        )
+        logging.info(
+            "Tip: Use 'llm status' to check component status"
+        )
     else:
-        logging.info(f"Starte {component} Komponente...")
-        docker.compose_up(f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", "")
-        logging.success(f"{component} Komponente erfolgreich gestartet.")
+        logging.info(f"Starting {component} component...")
+        docker.compose_up(
+            f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", ""
+        )
+        logging.success(f"{component} component successfully started.")
 
 
 @main.command()
 @click.argument("component", required=False)
-@click.option("--with", "with_module", help="Modul, das zusammen mit den Kernkomponenten gestoppt werden soll")
+@click.option(
+    "--with",
+    "with_module",
+    help="Module to stop along with the core components",
+)
 def stop(component: Optional[str], with_module: Optional[str]) -> None:
-    """Stoppt den Stack oder bestimmte Komponenten.
+    """Stop the stack or specific components.
 
-    COMPONENT ist der Name der zu stoppenden Komponente (z.B. ollama, librechat).
-    Wenn keine Komponente angegeben ist, werden alle Komponenten gestoppt.
+    Args:
+        component: Name of the component to stop (e.g., ollama, librechat).
+            If not specified, all components will be stopped.
+        with_module: Module to stop along with the core components.
     """
     if component is None and with_module is None:
-        logging.info("Stoppe alle Komponenten...")
+        logging.info("Stopping all components...")
         docker.compose_down(config.CORE_PROJECT, config.CORE_COMPOSE, "")
-        logging.success("Alle Komponenten erfolgreich gestoppt.")
+        logging.success("All components successfully stopped.")
     elif with_module is not None:
         if not os.path.isdir(f"modules/{with_module}"):
-            logging.error(f"Modul nicht gefunden: {with_module}")
+            logging.error(f"Module not found: {with_module}")
             sys.exit(1)
 
-        logging.info(f"Stoppe Kernkomponenten und {with_module} Modul...")
-        docker.compose_down(f"{config.CORE_PROJECT}-{with_module}", f"-f modules/{with_module}/docker-compose.yml", "")
+        logging.info(f"Stopping core components and {with_module} module...")
+        docker.compose_down(
+            f"{config.CORE_PROJECT}-{with_module}",
+            f"-f modules/{with_module}/docker-compose.yml",
+            "",
+        )
         docker.compose_down(config.CORE_PROJECT, config.CORE_COMPOSE, "")
-        logging.success(f"Kernkomponenten und {with_module} Modul erfolgreich gestoppt.")
+        logging.success(
+            f"Core components and {with_module} module successfully stopped."
+        )
     else:
-        logging.info(f"Stoppe {component} Komponente...")
-        docker.compose_down(f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", "")
-        logging.success(f"{component} Komponente erfolgreich gestoppt.")
+        logging.info(f"Stopping {component} component...")
+        docker.compose_down(
+            f"{config.CORE_PROJECT}-{component}", f"-f core/{component}.yml", ""
+        )
+        logging.success(f"{component} component successfully stopped.")
 
 
 @main.command()
 def status() -> None:
-    """Zeigt den Status aller Komponenten an."""
-    logging.info("Prüfe Status aller Komponenten...")
-    
-    # Container-Status mit besserer Formatierung abrufen
+    """Display the status of all components."""
+    logging.info("Checking status of all components...")
+
+    # Get container status with better formatting
     docker.show_container_status()
-    
-    # Hilfreiche Tipps anzeigen
-    # Port-Werte mit Fallbacks abrufen
+
+    # Display helpful tips
+    # Get port values with fallbacks
     librechat_port = config.get_config("HOST_PORT_LIBRECHAT", "3080")
     ollama_port = config.get_config("HOST_PORT_OLLAMA", "11434")
-    
+
     console.print()
-    logging.info(f"Tipp: Zugriff auf LibreChat unter http://localhost:{librechat_port}")
-    logging.info(f"Tipp: Ollama API ist verfügbar unter http://localhost:{ollama_port}")
+    logging.info(f"Tip: Access LibreChat at http://localhost:{librechat_port}")
+    logging.info(f"Tip: Ollama API is available at http://localhost:{ollama_port}")
 
 
 @main.command()
 @click.argument("component", required=False)
 def debug(component: Optional[str]) -> None:
-    """Startet Komponenten im Debug-Modus.
+    """Start components in debug mode.
 
-    COMPONENT ist der Name der zu debuggenden Komponente (derzeit wird nur 'librechat' unterstützt).
-    Wenn keine Komponente angegeben ist, werden alle Komponenten im Debug-Modus gestartet.
+    Args:
+        component: Name of the component to debug (currently only 'librechat' is supported).
+            If not specified, all components will be started in debug mode.
     """
     if component is None:
-        logging.info("Starte alle Komponenten im Debug-Modus...")
-        # Prüfen, ob Secrets generiert sind
+        logging.info("Starting all components in debug mode...")
+        # Check if secrets are generated
         config.check_secrets()
         docker.compose_up(config.DEBUG_PROJECT, config.DEBUG_COMPOSE, "")
-        logging.success("Kernkomponenten im Debug-Modus gestartet.")
-        logging.info("LibreChat Node.js-Debugger ist verfügbar unter localhost:9229")
-        logging.info("Tipp: Verwenden Sie VSCode's 'Attach to LibreChat' Debug-Konfiguration zum Verbinden")
+        logging.success("Core components started in debug mode.")
+        logging.info("LibreChat Node.js debugger is available at localhost:9229")
+        logging.info(
+            "Tip: Use VSCode's 'Attach to LibreChat' debug configuration to connect"
+        )
     elif component == "librechat":
-        logging.info("Starte LibreChat im Debug-Modus...")
+        logging.info("Starting LibreChat in debug mode...")
         docker.compose_up(config.DEBUG_PROJECT, config.DEBUG_COMPOSE, "librechat")
-        logging.success("LibreChat im Debug-Modus gestartet.")
-        logging.info("Node.js-Debugger ist verfügbar unter localhost:9229")
-        logging.info("Tipp: Verwenden Sie VSCode's 'Attach to LibreChat' Debug-Konfiguration zum Verbinden")
+        logging.success("LibreChat started in debug mode.")
+        logging.info("Node.js debugger is available at localhost:9229")
+        logging.info(
+            "Tip: Use VSCode's 'Attach to LibreChat' debug configuration to connect"
+        )
     else:
-        logging.error("Debug-Modus wird derzeit nur für LibreChat unterstützt.")
-        logging.info("Verwendung: llm debug [librechat]")
+        logging.error("Debug mode is currently only supported for LibreChat.")
+        logging.info("Usage: llm debug [librechat]")
         sys.exit(1)
 
 
@@ -148,33 +191,34 @@ def debug(component: Optional[str]) -> None:
 @click.argument("action", type=click.Choice(["list", "add", "remove"]))
 @click.argument("model", required=False)
 def models(action: str, model: Optional[str]) -> None:
-    """Verwaltet Modelle.
+    """Manage models.
 
-    ACTION ist die auszuführende Aktion (list, add, remove).
-    MODEL ist der Name des Modells (erforderlich für add und remove).
+    Args:
+        action: The action to perform (list, add, remove).
+        model: The name of the model (required for add and remove actions).
     """
     from llm_stack.core import models as models_module
-    
-    # Ollama-Port mit Fallback abrufen
+
+    # Get Ollama port with fallback
     ollama_port = config.get_config("HOST_PORT_OLLAMA", "11434")
     ollama_url = f"http://localhost:{ollama_port}"
-    
-    # Prüfen, ob Ollama läuft
+
+    # Check if Ollama is running
     if not models_module.check_ollama_running(ollama_url):
-        logging.error("Ollama-Dienst läuft nicht.")
-        logging.info("Tipp: Starten Sie Ollama zuerst mit 'llm start ollama'")
+        logging.error("Ollama service is not running.")
+        logging.info("Tip: Start Ollama first with 'llm start ollama'")
         sys.exit(1)
-    
+
     if action == "list":
         models_module.list_models(ollama_url)
     elif action == "add":
         if model is None:
-            logging.error("Modellname ist für die Aktion 'add' erforderlich")
+            logging.error("Model name is required for the 'add' action")
             sys.exit(1)
         models_module.add_model(ollama_url, model)
     elif action == "remove":
         if model is None:
-            logging.error("Modellname ist für die Aktion 'remove' erforderlich")
+            logging.error("Model name is required for the 'remove' action")
             sys.exit(1)
         models_module.remove_model(ollama_url, model)
 
@@ -182,46 +226,64 @@ def models(action: str, model: Optional[str]) -> None:
 @main.command()
 @click.argument("action", type=click.Choice(["show", "edit"]))
 def config_cmd(action: str) -> None:
-    """Zeigt oder bearbeitet die Konfiguration.
+    """Show or edit the configuration.
 
-    ACTION ist die auszuführende Aktion (show, edit).
+    Args:
+        action: The action to perform (show, edit).
     """
     if action == "show":
-        logging.info("Zeige Konfiguration...")
+        logging.info("Showing configuration...")
         config.show_config()
-        
-        # Hilfreiche Tipps anzeigen
+
+        # Display helpful tips
         console.print()
-        logging.info("Tipp: Bearbeiten Sie die Konfiguration mit 'llm config edit'")
+        logging.info("Tip: Edit the configuration with 'llm config edit'")
     elif action == "edit":
-        logging.info("Erstelle Backup der Konfiguration...")
+        logging.info("Creating backup of configuration...")
         backup_file = config.backup_config_file()
         if backup_file is None:
-            logging.error("Fehler beim Erstellen eines Backups der Konfigurationsdatei")
+            logging.error("Error creating backup of configuration file")
             sys.exit(1)
-        
-        logging.info("Bearbeite Konfiguration...")
+
+        logging.info("Editing configuration...")
         config.edit_config()
-        
-        logging.warn("Hinweis: Wenn Sie einen Fehler gemacht haben, können Sie vom Backup wiederherstellen:")
+
+        logging.warn(
+            "Note: If you made a mistake, you can restore from the backup:"
+        )
         logging.warn(f"cp {backup_file} {config.ENV_FILE}")
 
 
 @main.command()
 def generate_secrets() -> None:
-    """Generiert sichere Secrets für die Konfiguration."""
-    # Die Core-Bibliotheksfunktion verwenden
-    config.generate_secrets()
+    """Generate secure secrets for the configuration."""
+    # Die neue CLI-Befehlsimplementierung verwenden
+    return generate_secrets_cmd.generate_secrets()
+
+
+@main.command()
+def update_librechat_secrets() -> None:
+    """Update LibreChat secrets from the main configuration."""
+    return update_librechat_secrets_cmd.update_librechat_secrets()
+
+
+@main.command()
+def validate_configs() -> None:
+    """Validate all configuration files."""
+    return validate_configs_cmd.validate_configs()
 
 
 @main.help_option("-h", "--help")
 def help_cmd() -> None:
-    """Zeigt Hilfe für einen Befehl an."""
+    """Display help for a command."""
     pass
 
 
 if __name__ == "__main__":
     main()
 
-# Füge die Knowledge Graph CLI-Befehle hinzu
+# Add the Knowledge Graph CLI commands
 main.add_command(kg_cli)
+
+# Add the Code Quality CLI commands
+main.add_command(codeqa_cli)

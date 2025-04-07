@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOCAL-LLM-STACK-RELOADED Architecture Analysis</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        header h1 {
+            color: white;
+            margin: 0;
+        }
+        .timestamp {
+            color: #ecf0f1;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .section {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #2c3e50;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .metric {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            min-width: 120px;
+            text-align: center;
+        }
+        .metric .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            display: block;
+        }
+        .metric .label {
+            font-size: 0.8em;
+            display: block;
+        }
+        .visualization {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .visualization img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 24px;
+            background-color: #27ae60;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            line-height: 24px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>LOCAL-LLM-STACK-RELOADED Architecture Analysis</h1>
+        <div class="timestamp">Generated on: <span id="timestamp">{{timestamp}}</span></div>
+    </header>
+
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <div class="summary-box">
+            <p>This report presents the architectural analysis of the LOCAL-LLM-STACK-RELOADED project, a Python rewrite of the original Bash-based LOCAL-LLM-STACK. The analysis focuses on component relationships, module dependencies, migration progress, and overall system structure.</p>
+        </div>
+        
+        <div class="metrics">
+            <div class="metric">
+                <span class="value">{{component_count}}</span>
+                <span class="label">Components</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{module_count}}</span>
+                <span class="label">Modules</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{migration_progress}}%</span>
+                <span class="label">Migration Progress</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{relationship_types_count}}</span>
+                <span class="label">Relationship Types</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Component Analysis</h2>
+        <p>This section presents the analysis of system components and their relationships.</p>
+        
+        <h3>Component Metrics</h3>
+        <div class="metrics">
+            <div class="metric">
+                <span class="value">{{component_count}}</span>
+                <span class="label">Components</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{component_relationship_count}}</span>
+                <span class="label">Relationships</span>
+            </div>
+        </div>
+        
+        <h3>Component Relationships</h3>
+        <div class="visualization">
+            <img src="{{component_visualization}}" alt="Component Relationships Visualization">
+        </div>
+        
+        <h3>Component Types Distribution</h3>
+        <div class="visualization">
+            <img src="{{component_structure_visualization}}" alt="Component Types Distribution">
+        </div>
+        
+        <h3>Component Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Component Type</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody id="component-types-table">
+                <!-- Component types will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Module Analysis</h2>
+        <p>This section presents the analysis of system modules and their dependencies.</p>
+        
+        <h3>Module Metrics</h3>
+        <div class="metrics">
+            <div class="metric">
+                <span class="value">{{module_count}}</span>
+                <span class="label">Modules</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{module_dependency_count}}</span>
+                <span class="label">Dependencies</span>
+            </div>
+        </div>
+        
+        <h3>Module Dependencies</h3>
+        <div class="visualization">
+            <img src="{{module_visualization}}" alt="Module Dependencies Visualization">
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Migration Analysis</h2>
+        <p>This section presents the analysis of the migration from Bash to Python.</p>
+        
+        <h3>Migration Progress</h3>
+        <div class="metrics">
+            <div class="metric">
+                <span class="value">{{total_bash_files}}</span>
+                <span class="label">Total Bash Files</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{migrated_files}}</span>
+                <span class="label">Migrated Files</span>
+            </div>
+            <div class="metric">
+                <span class="value">{{migration_progress}}%</span>
+                <span class="label">Progress</span>
+            </div>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar">{{migration_progress}}%</div>
+        </div>
+        
+        <h3>Migration Visualization</h3>
+        <div class="visualization">
+            <img src="{{migration_visualization}}" alt="Migration Progress Visualization">
+        </div>
+        
+        <h3>Transformation Types</h3>
+        <div class="visualization">
+            <img src="{{transformation_visualization}}" alt="Transformation Types Visualization">
+        </div>
+        
+        <h3>Transformation Distribution</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Transformation Type</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody id="transformation-types-table">
+                <!-- Transformation types will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Relationship Analysis</h2>
+        <p>This section presents the analysis of relationship types in the system.</p>
+        
+        <h3>Relationship Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Relationship Type</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody id="relationship-types-table">
+                <!-- Relationship types will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>LOCAL-LLM-STACK-RELOADED Architecture Analysis Report</p>
+        <p>Generated by the Architecture Analyzer</p>
+    </div>
+
+    <script>
+        // Function to populate the report with data
+        function populateReport(data) {
+            // Set timestamp
+            document.getElementById('timestamp').textContent = new Date(data.timestamp).toLocaleString();
+            
+            // Set progress bar width
+            const progressBar = document.getElementById('progress-bar');
+            progressBar.style.width = data.migration_analysis.migration_progress + '%';
+            
+            // Populate component types table
+            const componentTypesTable = document.getElementById('component-types-table');
+            for (const [type, count] of Object.entries(data.structure_analysis.component_types)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${type}</td><td>${count}</td>`;
+                componentTypesTable.appendChild(row);
+            }
+            
+            // Populate transformation types table
+            const transformationTypesTable = document.getElementById('transformation-types-table');
+            for (const [type, count] of Object.entries(data.migration_analysis.transformation_types)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${type}</td><td>${count}</td>`;
+                transformationTypesTable.appendChild(row);
+            }
+            
+            // Populate relationship types table
+            const relationshipTypesTable = document.getElementById('relationship-types-table');
+            for (const [type, count] of Object.entries(data.structure_analysis.relationship_types)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${type}</td><td>${count}</td>`;
+                relationshipTypesTable.appendChild(row);
+            }
+        }
+        
+        // Load the data and populate the report
+        fetch('architecture_analysis/architecture_analysis.json')
+            .then(response => response.json())
+            .then(data => {
+                populateReport(data);
+            })
+            .catch(error => {
+                console.error('Error loading data:', error);
+            });
+    </script>
+</body>
+</html>

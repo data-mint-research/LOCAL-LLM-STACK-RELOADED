@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOCAL-LLM-STACK-RELOADED Architecture Analysis</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        header h1 {
+            color: white;
+            margin: 0;
+        }
+        .timestamp {
+            color: #ecf0f1;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .section {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #2c3e50;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .metric {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            min-width: 120px;
+            text-align: center;
+        }
+        .metric .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            display: block;
+        }
+        .metric .label {
+            font-size: 0.8em;
+            display: block;
+        }
+        .visualization {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .visualization img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 24px;
+            background-color: #27ae60;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            line-height: 24px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .recommendation {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .recommendation.high {
+            border-left-color: #e74c3c;
+        }
+        .recommendation.medium {
+            border-left-color: #f39c12;
+        }
+        .recommendation.low {
+            border-left-color: #27ae60;
+        }
+        .recommendation h4 {
+            margin-top: 0;
+        }
+        .recommendation .priority {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+            margin-left: 10px;
+        }
+        .recommendation .priority.high {
+            background-color: #e74c3c;
+        }
+        .recommendation .priority.medium {
+            background-color: #f39c12;
+        }
+        .recommendation .priority.low {
+            background-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>LOCAL-LLM-STACK-RELOADED Architecture Analysis</h1>
+        <div class="timestamp">Generated on: <span id="timestamp">{{timestamp}}</span></div>
+    </header>
+
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <div class="summary-box">
+            <p>This report presents a comprehensive architectural analysis of the LOCAL-LLM-STACK-RELOADED project, a Python rewrite of the original Bash-based LOCAL-LLM-STACK. The analysis focuses on the project's architecture patterns, file organization, component relationships, and adherence to established conventions.</p>
+        </div>
+        
+        <div class="metrics">
+            <div class="metric">
+                <span class="value" id="total-files">0</span>
+                <span class="label">Python Files</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="component-count">0</span>
+                <span class="label">Components</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="orphaned-files-count">0</span>
+                <span class="label">Orphaned Files</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="architecture-gaps-count">0</span>
+                <span class="label">Architecture Gaps</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Architecture Baseline</h2>
+        <p>This section presents the baseline architecture of the project, including directory structure, key interfaces, and architectural patterns.</p>
+        
+        <h3>Directory Structure</h3>
+        <div id="directory-structure">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Directory</th>
+                        <th>File Count</th>
+                    </tr>
+                </thead>
+                <tbody id="directory-structure-table">
+                    <!-- Directory structure will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <h3>Key Components</h3>
+        <div class="metrics">
+            <div class="metric">
+                <span class="value" id="core-files">0</span>
+                <span class="label">Core</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="modules-files">0</span>
+                <span class="label">Modules</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="tools-files">0</span>
+                <span class="label">Tools</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="kg-files">0</span>
+                <span class="label">Knowledge Graph</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="cli-files">0</span>
+                <span class="label">CLI Commands</span>
+            </div>
+            <div class="metric">
+                <span class="value" id="cq-files">0</span>
+                <span class="label">Code Quality</span>
+            </div>
+        </div>
+        
+        <h3>Key Interfaces</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Interface</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody id="interfaces-table">
+                <!-- Interfaces will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Component Analysis</h2>
+        <p>This section presents the analysis of system components and their organization.</p>
+        
+        <h3>Core Components</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody id="core-components-table">
+                <!-- Core components will be inserted here -->
+            </tbody>
+        </table>
+        
+        <h3>Modules</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Module</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody id="modules-table">
+                <!-- Modules will be inserted here -->
+            </tbody>
+        </table>
+        
+        <h3>Tools</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody id="tools-table">
+                <!-- Tools will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Pattern & Convention Analysis</h2>
+        <p>This section presents the analysis of architectural patterns and conventions used in the project.</p>
+        
+        <h3>Architectural Patterns</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Pattern</th>
+                    <th>Status</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody id="patterns-table">
+                <!-- Patterns will be inserted here -->
+            </tbody>
+        </table>
+        
+        <h3>Conventions</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Convention</th>
+                    <th>Compliance</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="conventions-table">
+                <!-- Conventions will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Orphaned Files Analysis</h2>
+        <p>This section presents the analysis of orphaned files and their impact on the system.</p>
+        
+        <h3>Orphaned Files</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Risk Level</th>
+                    <th>Impact</th>
+                </tr>
+            </thead>
+            <tbody id="orphaned-files-table">
+                <!-- Orphaned files will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Gap Analysis</h2>
+        <p>This section presents the analysis of gaps in the architecture.</p>
+        
+        <h3>Architecture Gaps</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Impact</th>
+                </tr>
+            </thead>
+            <tbody id="architecture-gaps-table">
+                <!-- Architecture gaps will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Recommendations</h2>
+        <p>This section presents recommendations for improving the architecture.</p>
+        
+        <h3>Structure Recommendations</h3>
+        <div id="structure-recommendations">
+            <!-- Structure recommendations will be inserted here -->
+        </div>
+        
+        <h3>Pattern Recommendations</h3>
+        <div id="pattern-recommendations">
+            <!-- Pattern recommendations will be inserted here -->
+        </div>
+        
+        <h3>Convention Recommendations</h3>
+        <div id="convention-recommendations">
+            <!-- Convention recommendations will be inserted here -->
+        </div>
+        
+        <h3>Orphaned Files Recommendations</h3>
+        <div id="orphaned-files-recommendations">
+            <!-- Orphaned files recommendations will be inserted here -->
+        </div>
+        
+        <h3>Gap Closure Recommendations</h3>
+        <div id="gap-closure-recommendations">
+            <!-- Gap closure recommendations will be inserted here -->
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>LOCAL-LLM-STACK-RELOADED Architecture Analysis Report</p>
+        <p>Generated by the Architecture Analyzer</p>
+    </div>
+
+    <script>
+        // Function to populate the report with data
+        function populateReport(data) {
+            // Set timestamp
+            document.getElementById('timestamp').textContent = new Date(data.timestamp).toLocaleString();
+            
+            // Set executive summary metrics
+            document.getElementById('total-files').textContent = data.architecture_baseline.directory_structure.total_python_files;
+            document.getElementById('component-count').textContent = Object.keys(data.component_analysis).length;
+            document.getElementById('orphaned-files-count').textContent = data.orphaned_files_assessment.orphaned_files.length;
+            document.getElementById('architecture-gaps-count').textContent = data.gap_analysis.architecture_gaps.length;
+            
+            // Set component metrics
+            document.getElementById('core-files').textContent = data.component_analysis.core.file_count;
+            document.getElementById('modules-files').textContent = data.component_analysis.modules.file_count;
+            document.getElementById('tools-files').textContent = data.component_analysis.tools.file_count;
+            document.getElementById('kg-files').textContent = data.component_analysis.knowledge_graph.file_count;
+            document.getElementById('cli-files').textContent = data.component_analysis.cli_commands.file_count;
+            document.getElementById('cq-files').textContent = data.component_analysis.code_quality.file_count;
+            
+            // Populate directory structure table
+            const directoryStructureTable = document.getElementById('directory-structure-table');
+            for (const [directory, count] of Object.entries(data.architecture_baseline.directory_structure.directory_counts)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${directory}</td><td>${count}</td>`;
+                directoryStructureTable.appendChild(row);
+            }
+            
+            // Populate interfaces table
+            const interfacesTable = document.getElementById('interfaces-table');
+            for (const [interface, info] of Object.entries(data.architecture_baseline.interfaces)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${interface}</td><td>${info.docstring || 'No description available'}</td>`;
+                interfacesTable.appendChild(row);
+            }
+            
+            // Populate core components table
+            const coreComponentsTable = document.getElementById('core-components-table');
+            for (const file of data.component_analysis.core.files) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${file}</td><td>Core component</td>`;
+                coreComponentsTable.appendChild(row);
+            }
+            
+            // Populate modules table
+            const modulesTable = document.getElementById('modules-table');
+            for (const module of data.component_analysis.modules.modules) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${module}</td><td>Module component</td>`;
+                modulesTable.appendChild(row);
+            }
+            
+            // Populate tools table
+            const toolsTable = document.getElementById('tools-table');
+            for (const tool of data.component_analysis.tools.tools) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${tool}</td><td>Tool component</td>`;
+                toolsTable.appendChild(row);
+            }
+            
+            // Populate patterns table
+            const patternsTable = document.getElementById('patterns-table');
+            for (const [pattern, info] of Object.entries(data.pattern_analysis)) {
+                const row = document.createElement('tr');
+                const status = info.exists ? 'Present' : 'Missing';
+                const implementation = info.files ? info.files.join(', ') : 'N/A';
+                row.innerHTML = `<td>${pattern.replace('_', ' ')}</td><td>${status}</td><td>${implementation}</td>`;
+                patternsTable.appendChild(row);
+            }
+            
+            // Populate conventions table
+            const conventionsTable = document.getElementById('conventions-table');
+            for (const [convention, info] of Object.entries(data.convention_analysis)) {
+                const row = document.createElement('tr');
+                const compliance = info.compliance_percentage ? `${info.compliance_percentage.toFixed(2)}%` : 'N/A';
+                const details = 'See details in the report';
+                row.innerHTML = `<td>${convention.replace('_', ' ')}</td><td>${compliance}</td><td>${details}</td>`;
+                conventionsTable.appendChild(row);
+            }
+            
+            // Populate orphaned files table
+            const orphanedFilesTable = document.getElementById('orphaned-files-table');
+            for (const assessment of data.orphaned_files_assessment.impact_assessment) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${assessment.file}</td><td>${assessment.risk_level}</td><td>${assessment.impact}</td>`;
+                orphanedFilesTable.appendChild(row);
+            }
+            
+            // Populate architecture gaps table
+            const architectureGapsTable = document.getElementById('architecture-gaps-table');
+            for (const gap of data.gap_analysis.architecture_gaps) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${gap.type}</td><td>${gap.name}</td><td>${gap.impact}</td>`;
+                architectureGapsTable.appendChild(row);
+            }
+            
+            // Populate recommendations
+            function populateRecommendations(recommendations, containerId) {
+                const container = document.getElementById(containerId);
+                for (const recommendation of recommendations) {
+                    const div = document.createElement('div');
+                    div.className = `recommendation ${recommendation.priority.toLowerCase()}`;
+                    div.innerHTML = `
+                        <h4>${recommendation.name} <span class="priority ${recommendation.priority.toLowerCase()}">${recommendation.priority}</span></h4>
+                        <p>${recommendation.description}</p>
+                    `;
+                    container.appendChild(div);
+                }
+            }
+            
+            populateRecommendations(data.recommendations.structure_recommendations, 'structure-recommendations');
+            populateRecommendations(data.recommendations.pattern_recommendations, 'pattern-recommendations');
+            populateRecommendations(data.recommendations.convention_recommendations, 'convention-recommendations');
+            populateRecommendations(data.recommendations.orphaned_files_recommendations, 'orphaned-files-recommendations');
+            populateRecommendations(data.recommendations.gap_closure_recommendations, 'gap-closure-recommendations');
+        }
+        
+        // Load the data and populate the report
+        fetch('architecture_analysis_results.json')
+            .then(response => response.json())
+            .then(data => {
+                populateReport(data);
+            })
+            .catch(error => {
+                console.error('Error loading data:', error);
+            });
+    </script>
+</body>
+</html>
